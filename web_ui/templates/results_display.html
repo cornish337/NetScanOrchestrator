@@ -33,7 +33,7 @@
             <dl>
             {% for key, value in data.stats.items() %}
                 <dt>{{ key.replace('_', ' ').title() }}</dt>
-                {% if value is mapping or value is list %}
+                {% if value is mapping or value.__class__.__name__ == 'list' %}
                     <dd><pre>{{ value | tojson(indent=2) }}</pre></dd>
                 {% else %}
                     <dd>{{ value }}</dd>
