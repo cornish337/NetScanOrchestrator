@@ -31,7 +31,7 @@ The Nmap Parallel Scanner consists of several core components:
 
 **Prerequisites:**
 - Python 3.7+
-- Nmap (must be installed and accessible in your system's PATH)
+- Nmap: This is the primary system-level dependency. Ensure Nmap is installed and accessible in your system's PATH for the scanner to function correctly.
 
 **Steps:**
 1.  **Clone the repository:**
@@ -88,6 +88,25 @@ The Nmap Parallel Scanner consists of several core components:
     - `-v "$(pwd)/my_scan_inputs:/inputs"`: Mounts `./my_scan_inputs` on your host to `/inputs` in the container.
     - `-v "$(pwd)/my_scan_outputs:/outputs"`: Mounts `./my_scan_outputs` on your host to `/outputs` in the container.
     - The `-i` and `-o` paths are relative to the container's filesystem.
+
+### Using the Makefile
+
+A `Makefile` is provided in the root of the project to simplify common operations. It offers targets for installation, Docker image building, running scans, starting the web UI, and cleaning up temporary files.
+
+Here are some common targets:
+-   `make help`: Displays a help message listing all available targets.
+-   `make install`: Installs Python dependencies from `requirements.txt` (ideally into an active virtual environment).
+-   `make build-docker`: Builds the Docker image for the scanner, tagging it as `nmap_parallel_scanner`.
+-   `make run-cli-scan`: Runs an Nmap scan using the local Python script.
+-   `make run-docker-scan`: Runs an Nmap scan using the Docker container.
+-   `make start-webui`: Starts the Flask web UI for viewing scan results.
+-   `make clean`: Removes Python cache files (`.pyc`, `__pycache__`), Pytest cache, coverage data, etc.
+
+You can customize scan parameters for `run-cli-scan` and `run-docker-scan` directly within the `Makefile` by editing variables like `INPUT_FILE`, `OUTPUT_PREFIX`, `NMAP_OPTIONS`, and `FORMATS`. Alternatively, you can override these variables from the command line when invoking `make`. For example:
+```bash
+make run-cli-scan INPUT_FILE=path/to/your_custom_ips.txt OUTPUT_PREFIX=results/custom_scan_results
+```
+This allows for flexible scan execution without modifying the Makefile itself for each run.
 
 ## Usage
 
