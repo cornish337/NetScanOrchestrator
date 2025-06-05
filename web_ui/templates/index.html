@@ -8,10 +8,18 @@
         h1 { color: #0056b3; }
         /* ... other styles ... */
         .form-section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        .host-management-area { margin-top: 20px; }
+        .host-list { border: 1px solid #ccc; min-height: 100px; padding: 10px; margin-bottom: 10px; background-color: #f9f9f9; border-radius: 4px; }
+        .host-item { background-color: #fff; border: 1px solid #ddd; padding: 8px; margin-bottom: 5px; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; }
+        .host-item button { padding: 3px 8px; font-size: 0.9em; margin-left: 5px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .host-item button:hover { background-color: #0056b3; }
+        .batch-section { margin-bottom: 15px; padding: 10px; border: 1px solid #bdbcbc; border-radius: 4px; background-color: #e9ecef; }
+        .batch-section h4 { margin-top: 0; color: #333; }
+        .batch-section .host-item { background-color: #fdfdfd; } /* Slightly different background for hosts in batches */
         label { display: block; margin-top: 10px; margin-bottom: 5px; font-weight: bold; }
         textarea, input[type='text'] { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        input[type='submit'] { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
-        input[type='submit']:hover { background-color: #0056b3; }
+        input[type='submit'], button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; } /* Added button styling here */
+        input[type='submit']:hover, button:hover { background-color: #0056b3; } /* Added button hover styling */
         ul { list-style-type: none; padding: 0; }
         li { margin-bottom: 10px; background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
         li a { text-decoration: none; color: #007bff; }
@@ -45,6 +53,78 @@ example.com"></textarea>
             </form>
         </div>
 
+        <!-- Host and Batch Management Section -->
+        <div class="form-section">
+            <h2>Host and Batch Management</h2>
+            <div>
+                <label for="host-list-input">Paste List of Hosts (one per line):</label>
+                <textarea id="host-list-input" rows="5" placeholder="e.g.
+host1.example.com
+192.168.1.10
+192.168.1.11"></textarea>
+                <button id="load-hosts-btn">Load Hosts</button>
+            </div>
+
+            <div class="host-management-area">
+                <h3>Unassigned Hosts</h3>
+                <div id="unassigned-hosts" class="host-list">
+                    <!-- Unassigned hosts will be populated here by JavaScript -->
+                    <!-- Example structure (will be created by JS):
+                    <div class="host-item">
+                        <input type="checkbox" class="host-select-checkbox">
+                        <span>192.168.1.101</span>
+                    </div>
+                    -->
+                </div>
+                <div style="margin-top:10px;">
+                    <label for="target-batch-select" style="margin-right: 5px;">Target Batch:</label>
+                    <select id="target-batch-select" style="margin-right: 5px;">
+                        <option value="">-- Select Batch --</option>
+                    </select>
+                    <button id="move-selected-btn">Move Selected to Batch</button>
+                </div>
+            </div>
+
+            <div class="host-management-area">
+                <label for="batch-name-input">Batch Name:</label>
+                <input type="text" id="batch-name-input" placeholder="e.g. Batch 1 - Critical Servers">
+                <button id="create-batch-btn">Create Batch</button>
+            </div>
+
+            <div class="host-management-area">
+                <h3>Batches</h3>
+                <div id="batches-area">
+                    <!-- Example Batch Section -->
+                    <div class="batch-section" data-batch-name="Sample Batch 1">
+                        <h4>Sample Batch 1</h4>
+                        <div class="host-list">
+                            <div class="host-item" data-host-id="10.0.0.1">
+                                <span>10.0.0.1</span>
+                                <!-- Button to remove from batch or move back to unassigned could go here -->
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Batches and their assigned hosts will be displayed here -->
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <button id="save-config-btn">Save Configuration</button>
+            </div>
+        </div>
+
+        <!-- Load Configuration Section -->
+        <div class="form-section">
+            <h2>Load Configuration</h2>
+            <div>
+                <label for="config-files-select">Select Configuration File:</label>
+                <select id="config-files-select">
+                    <!-- Configuration files will be listed here -->
+                    <option value="">-- Select a Configuration --</option>
+                </select>
+                <button id="load-selected-config-btn" style="margin-top: 10px;">Load Selected Configuration</button>
+            </div>
+        </div>
+
         <h2>Available JSON Result Files:</h2>
         <p><em>Displaying files from: {{ RESULTS_DIR_DISPLAY }}</em></p>
         {% if files %}
@@ -58,6 +138,324 @@ example.com"></textarea>
             <p>To test, run a scan using the main CLI script (e.g., <code>python nmap_parallel_scanner.py -i your_ips.txt -o {{ RESULTS_DIR_DISPLAY }}/my_scan_results --formats json</code>) and ensure JSON output is saved in the configured directory.</p>
         {% endif %}
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- DOM Element References ---
+            const hostListInput = document.getElementById('host-list-input');
+            const loadHostsBtn = document.getElementById('load-hosts-btn');
+            const unassignedHostsDiv = document.getElementById('unassigned-hosts');
+
+            const batchNameInput = document.getElementById('batch-name-input');
+            const createBatchBtn = document.getElementById('create-batch-btn');
+            const batchesAreaDiv = document.getElementById('batches-area');
+
+            const targetBatchSelect = document.getElementById('target-batch-select');
+            const moveSelectedBtn = document.getElementById('move-selected-btn');
+
+            const saveConfigBtn = document.getElementById('save-config-btn');
+            const configFilesSelect = document.getElementById('config-files-select');
+            const loadSelectedConfigBtn = document.getElementById('load-selected-config-btn');
+
+            // --- Helper Functions ---
+            function displayMessage(message, type = 'info') {
+                // Simple alert for now, can be improved to show in a dedicated div
+                alert(`${type.toUpperCase()}: ${message}`);
+                if (type === 'error') console.error(message);
+                else console.log(message);
+            }
+
+            function refreshBatchDropdown() {
+                targetBatchSelect.innerHTML = '<option value="">-- Select Batch --</option>'; // Clear existing options
+                const batchSections = batchesAreaDiv.querySelectorAll('.batch-section');
+                batchSections.forEach(batch => {
+                    const batchName = batch.dataset.batchName;
+                    if (batchName) {
+                        const option = document.createElement('option');
+                        option.value = batchName;
+                        option.textContent = batchName;
+                        targetBatchSelect.appendChild(option);
+                    }
+                });
+            }
+
+            // --- Initial Population of Config Files Dropdown ---
+            const projectFiles = {{ project_files | tojson }};
+            configFilesSelect.innerHTML = '<option value="">-- Select a Configuration --</option>'; // Clear previous
+            if (projectFiles && projectFiles.length > 0) {
+                projectFiles.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    configFilesSelect.appendChild(option);
+                });
+            }
+
+            // --- Event Listener Implementations ---
+
+            // 1. Load Hosts
+            loadHostsBtn.addEventListener('click', function() {
+                const hostsText = hostListInput.value.trim();
+                unassignedHostsDiv.innerHTML = ''; // Clear previous
+                if (!hostsText) {
+                    displayMessage('Host list is empty.', 'warning');
+                    return;
+                }
+                const hosts = hostsText.split('\n').map(h => h.trim()).filter(h => h);
+                hosts.forEach(host => {
+                    const hostItem = document.createElement('div');
+                    hostItem.className = 'host-item';
+                    hostItem.dataset.hostId = host; // Use actual host string as ID for simplicity
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'host-select-checkbox';
+                    checkbox.value = host;
+
+                    const span = document.createElement('span');
+                    span.textContent = host;
+
+                    hostItem.appendChild(checkbox);
+                    hostItem.appendChild(span);
+                    unassignedHostsDiv.appendChild(hostItem);
+                });
+                hostListInput.value = ''; // Clear textarea
+            });
+
+            // 2. Create Batch
+            createBatchBtn.addEventListener('click', function() {
+                const batchName = batchNameInput.value.trim();
+                if (!batchName) {
+                    displayMessage('Batch name cannot be empty.', 'warning');
+                    return;
+                }
+                // Check if batch name already exists
+                if (batchesAreaDiv.querySelector(`.batch-section[data-batch-name="${batchName}"]`)) {
+                    displayMessage(`Batch "${batchName}" already exists.`, 'warning');
+                    return;
+                }
+
+                const batchSection = document.createElement('div');
+                batchSection.className = 'batch-section';
+                batchSection.dataset.batchName = batchName;
+
+                const title = document.createElement('h4');
+                title.textContent = batchName; // Changed from "Batch: " + batchName for cleaner look
+
+                const hostListDiv = document.createElement('div');
+                hostListDiv.className = 'host-list'; // Re-use host-list class for styling
+
+                batchSection.appendChild(title);
+                batchSection.appendChild(hostListDiv);
+                batchesAreaDiv.appendChild(batchSection);
+
+                batchNameInput.value = ''; // Clear input
+                refreshBatchDropdown();
+                displayMessage(`Batch "${batchName}" created.`, 'success');
+            });
+
+            // 3. Move Selected Hosts to Batch
+            moveSelectedBtn.addEventListener('click', function() {
+                const selectedBatchName = targetBatchSelect.value;
+                if (!selectedBatchName) {
+                    displayMessage('Please select a target batch.', 'warning');
+                    return;
+                }
+                const targetBatchDiv = batchesAreaDiv.querySelector(`.batch-section[data-batch-name="${selectedBatchName}"] .host-list`);
+                if (!targetBatchDiv) {
+                    displayMessage('Target batch section not found. This should not happen.', 'error');
+                    return;
+                }
+
+                const selectedCheckboxes = unassignedHostsDiv.querySelectorAll('.host-select-checkbox:checked');
+                if (selectedCheckboxes.length === 0) {
+                    displayMessage('No hosts selected to move.', 'warning');
+                    return;
+                }
+
+                selectedCheckboxes.forEach(checkbox => {
+                    const hostItem = checkbox.parentElement;
+                    const hostName = checkbox.value; // Assuming checkbox value is the host identifier
+
+                    // Check if host already in target batch to avoid duplicates
+                    let hostAlreadyInBatch = false;
+                    targetBatchDiv.querySelectorAll('.host-item span').forEach(span => {
+                        if(span.textContent === hostName) {
+                            hostAlreadyInBatch = true;
+                        }
+                    });
+
+                    if (hostAlreadyInBatch) {
+                        displayMessage(`Host "${hostName}" is already in batch "${selectedBatchName}". Skipping.`, 'info');
+                        // Optionally remove from unassigned anyway, or just uncheck and leave it
+                        hostItem.remove(); // Remove from unassigned list
+                        return; // Skip adding to batch
+                    }
+
+                    const newHostEntry = document.createElement('div');
+                    newHostEntry.className = 'host-item'; // Consistent styling
+                    newHostEntry.dataset.hostId = hostName;
+
+                    const span = document.createElement('span');
+                    span.textContent = hostName;
+
+                    // Add a remove button for hosts within batches
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.className = 'remove-from-batch-btn'; // For styling and event handling if needed later
+                    removeBtn.onclick = function() {
+                        // Move back to unassigned or simply remove
+                        // For now, just remove from batch. A more complex "move back" could be added.
+                        newHostEntry.remove();
+                        // Optional: Add back to unassigned hosts list
+                        // addHostToUnassigned(hostName);
+                        displayMessage(`Host "${hostName}" removed from batch "${selectedBatchName}".`, 'info');
+                    };
+
+                    newHostEntry.appendChild(span);
+                    newHostEntry.appendChild(removeBtn);
+                    targetBatchDiv.appendChild(newHostEntry);
+                    hostItem.remove(); // Remove from unassigned list
+                });
+                displayMessage(`${selectedCheckboxes.length} host(s) moved to "${selectedBatchName}".`, 'success');
+            });
+
+            // 4. Save Configuration
+            saveConfigBtn.addEventListener('click', async function() {
+                const unassigned = [];
+                unassignedHostsDiv.querySelectorAll('.host-item span').forEach(span => {
+                    unassigned.push(span.textContent);
+                });
+
+                const batches = {};
+                batchesAreaDiv.querySelectorAll('.batch-section').forEach(batchDiv => {
+                    const batchName = batchDiv.dataset.batchName;
+                    batches[batchName] = [];
+                    batchDiv.querySelectorAll('.host-list .host-item span').forEach(span => {
+                        batches[batchName].push(span.textContent);
+                    });
+                });
+
+                const configData = {
+                    unassigned_hosts: unassigned,
+                    batches: batches
+                };
+
+                try {
+                    const response = await fetch("{{ url_for('save_host_config') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(configData),
+                    });
+                    const result = await response.json();
+                    if (response.ok && result.status === 'success') {
+                        displayMessage(`Configuration saved as ${result.filename}`, 'success');
+                        // Refresh project files dropdown
+                        const option = document.createElement('option');
+                        option.value = result.filename;
+                        option.textContent = result.filename;
+                        // Add to the beginning of the list (optional, could also re-fetch all)
+                        if (configFilesSelect.options.length > 1) {
+                             configFilesSelect.insertBefore(option, configFilesSelect.options[1]);
+                        } else {
+                             configFilesSelect.appendChild(option);
+                        }
+                        configFilesSelect.value = result.filename;
+
+                    } else {
+                        displayMessage(`Error saving configuration: ${result.message}`, 'error');
+                    }
+                } catch (error) {
+                    displayMessage(`Network or server error: ${error.message}`, 'error');
+                }
+            });
+
+            // 5. Load Configuration
+            loadSelectedConfigBtn.addEventListener('click', async function() {
+                const filename = configFilesSelect.value;
+                if (!filename) {
+                    displayMessage('Please select a configuration file to load.', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`{{ url_for('load_host_config', filename='PLACEHOLDER_FILENAME') }}`.replace('PLACEHOLDER_FILENAME', filename));
+                    const result = await response.json();
+
+                    if (response.ok && result.status === 'success') {
+                        const config = result.data;
+
+                        // Clear existing UI
+                        unassignedHostsDiv.innerHTML = '';
+                        batchesAreaDiv.innerHTML = '';
+                        targetBatchSelect.innerHTML = '<option value="">-- Select Batch --</option>';
+
+                        // Populate Unassigned Hosts
+                        if (config.unassigned_hosts) {
+                            config.unassigned_hosts.forEach(host => {
+                                const hostItem = document.createElement('div');
+                                hostItem.className = 'host-item';
+                                hostItem.dataset.hostId = host;
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.className = 'host-select-checkbox';
+                                checkbox.value = host;
+                                const span = document.createElement('span');
+                                span.textContent = host;
+                                hostItem.appendChild(checkbox);
+                                hostItem.appendChild(span);
+                                unassignedHostsDiv.appendChild(hostItem);
+                            });
+                        }
+
+                        // Populate Batches
+                        if (config.batches) {
+                            for (const batchName in config.batches) {
+                                const batchSection = document.createElement('div');
+                                batchSection.className = 'batch-section';
+                                batchSection.dataset.batchName = batchName;
+                                const title = document.createElement('h4');
+                                title.textContent = batchName;
+                                const hostListDiv = document.createElement('div');
+                                hostListDiv.className = 'host-list';
+
+                                config.batches[batchName].forEach(hostInBatch => {
+                                    const batchHostItem = document.createElement('div');
+                                    batchHostItem.className = 'host-item';
+                                    batchHostItem.dataset.hostId = hostInBatch;
+                                    const span = document.createElement('span');
+                                    span.textContent = hostInBatch;
+
+                                    const removeBtn = document.createElement('button');
+                                    removeBtn.textContent = 'Remove';
+                                    removeBtn.className = 'remove-from-batch-btn';
+                                    removeBtn.onclick = function() {
+                                        batchHostItem.remove();
+                                        displayMessage(`Host "${hostInBatch}" removed from batch "${batchName}".`, 'info');
+                                    };
+
+                                    batchHostItem.appendChild(span);
+                                    batchHostItem.appendChild(removeBtn);
+                                    hostListDiv.appendChild(batchHostItem);
+                                });
+                                batchSection.appendChild(title);
+                                batchSection.appendChild(hostListDiv);
+                                batchesAreaDiv.appendChild(batchSection);
+                            }
+                        }
+                        refreshBatchDropdown(); // Update dropdown with loaded batch names
+                        displayMessage(`Configuration "${filename}" loaded successfully.`, 'success');
+                    } else {
+                        displayMessage(`Error loading configuration: ${result.message}`, 'error');
+                    }
+                } catch (error) {
+                    displayMessage(`Network or server error: ${error.message}`, 'error');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 ```

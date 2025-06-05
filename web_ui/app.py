@@ -22,6 +22,16 @@ app.secret_key = os.urandom(24) # Needed for flash messages
 # relative to the project root.
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 RESULTS_DIR = os.path.join(PROJECT_ROOT, 'data', 'cli_outputs')
+PROJECT_FILES_DIR = os.path.join(PROJECT_ROOT, 'data', 'project_files') # New directory for project files
+
+# Ensure PROJECT_FILES_DIR exists
+if not os.path.exists(PROJECT_FILES_DIR):
+    try:
+        os.makedirs(PROJECT_FILES_DIR)
+    except OSError as e:
+        # Consider logging this error
+        print(f"Error creating project files directory {PROJECT_FILES_DIR}: {e}")
+
 
 # Context processor to make RESULTS_DIR available in templates
 @app.context_processor
@@ -110,16 +120,92 @@ def run_scan():
 @app.route('/')
 def index():
     # List available JSON result files for viewing
-    available_files = []
+    available_scan_files = []
     if os.path.exists(RESULTS_DIR):
         try:
-            available_files = sorted([f for f in os.listdir(RESULTS_DIR) if f.endswith('.json')], reverse=True)
+            available_scan_files = sorted([f for f in os.listdir(RESULTS_DIR) if f.endswith('.json')], reverse=True)
         except OSError as e:
-            print(f"Error listing files in {RESULTS_DIR}: {e}")
-            # Optionally, pass an error message to the template
-            pass # available_files will remain empty
+            app.logger.error(f"Error listing files in {RESULTS_DIR}: {e}")
+            flash(f"Could not list scan result files: {e}", "error")
+            pass # available_scan_files will remain empty
 
-    return render_template('index.html', files=available_files)
+    # List available JSON project configuration files
+    available_project_files = []
+    if os.path.exists(PROJECT_FILES_DIR):
+        try:
+            available_project_files = sorted([f for f in os.listdir(PROJECT_FILES_DIR) if f.endswith('.json')], reverse=True)
+        except OSError as e:
+            app.logger.error(f"Error listing files in {PROJECT_FILES_DIR}: {e}")
+            flash(f"Could not list project configuration files: {e}", "error")
+            pass # available_project_files will remain empty
+
+    return render_template('index.html', files=available_scan_files, project_files=available_project_files)
+
+
+from werkzeug.exceptions import BadRequest # Import BadRequest
+
+@app.route('/save_host_config', methods=['POST'])
+def save_host_config():
+    if not request.is_json: # Check Content-Type header first
+        return {"status": "error", "message": "Content-Type must be application/json"}, 415 # Unsupported Media Type
+
+    try:
+        config_data = request.get_json()
+        # If request.is_json is true, get_json() will parse it.
+        # If parsing fails (malformed JSON), it raises a BadRequest (400).
+        # If C-T is application/json and body is empty, config_data will be None.
+        if config_data is None:
+            return {"status": "error", "message": "No JSON data provided in the request body or JSON is null."}, 400
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"project_config_{timestamp}.json"
+        filepath = os.path.join(PROJECT_FILES_DIR, filename)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=4)
+
+        # flash() is not typically useful for API endpoints that return JSON
+        # flash(f"Configuration saved successfully as {filename}", 'success')
+        app.logger.info(f"Configuration saved successfully as {filename}")
+        return {"status": "success", "message": "Configuration saved", "filename": filename}, 200
+    except BadRequest as e: # Handles malformed JSON if C-T was application/json
+        app.logger.warning(f"Malformed JSON received for save_host_config: {e.description}")
+        return {"status": "error", "message": f"Malformed JSON: {e.description}"}, 400
+    except Exception as e:
+        app.logger.error(f"Error saving host configuration: {e}", exc_info=True)
+        # flash(f"Error saving configuration: {e}", 'error')
+        return {"status": "error", "message": "An unexpected error occurred while saving configuration."}, 500
+
+
+@app.route('/load_host_config/<path:filename>', methods=['GET'])
+def load_host_config(filename):
+    # Security: Normalize the path and ensure it's within PROJECT_FILES_DIR.
+    requested_path = os.path.normpath(os.path.join(PROJECT_FILES_DIR, filename))
+
+    if not requested_path.startswith(os.path.abspath(PROJECT_FILES_DIR) + os.sep):
+        # Using app.logger for server-side logging of the attempt
+        app.logger.warning(f"Potential directory traversal attempt for filename: {filename}")
+        return {"status": "error", "message": "Invalid filename or path."}, 400
+
+    if not filename.endswith('.json'):
+        return {"status": "error", "message": "Invalid file type. Only JSON files are allowed."}, 400
+
+    filepath = requested_path
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+        return {"status": "success", "data": config_data}, 200
+    except FileNotFoundError:
+        app.logger.info(f"Configuration file not found: {filename}")
+        return {"status": "error", "message": "Configuration file not found."}, 404
+    except json.JSONDecodeError:
+        app.logger.error(f"Error decoding JSON from configuration file: {filename}")
+        return {"status": "error", "message": "Error decoding JSON from file."}, 500
+    except Exception as e:
+        app.logger.error(f"Unexpected error loading configuration {filename}: {e}", exc_info=True)
+        return {"status": "error", "message": f"An unexpected error occurred: {str(e)}"}, 500
+
 
 @app.route('/view_results/<path:filename>') # Use <path:filename> to allow slashes if files are in subdirs of RESULTS_DIR
 def view_results(filename):
@@ -174,5 +260,13 @@ if __name__ == '__main__':
     print(f"Flask app running. Access at http://127.0.0.1:5000")
     print(f"Serving results from: {os.path.abspath(RESULTS_DIR)}")
     # Note: app.run() is only for development. For production, use a WSGI server like Gunicorn.
+
+    # Ensure PROJECT_FILES_DIR also exists at startup (though created above, good for standalone run)
+    if not os.path.exists(PROJECT_FILES_DIR):
+        try:
+            os.makedirs(PROJECT_FILES_DIR)
+            print(f"Created project files directory: {PROJECT_FILES_DIR}")
+        except OSError as e:
+            print(f"Error creating project files directory {PROJECT_FILES_DIR}: {e}")
+
     app.run(debug=True, host='0.0.0.0', port=5000) # Listen on all interfaces for easier access if in a VM/container. Explicit port.
-```
