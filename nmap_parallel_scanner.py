@@ -229,4 +229,3 @@ if __name__ == "__main__":
     # This allows the script to be run directly.
     # For a packaged application, entry points in setup.py would be used.
     main()
-```

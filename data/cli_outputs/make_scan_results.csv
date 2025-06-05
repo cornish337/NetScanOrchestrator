@@ -1,0 +1,5 @@
+Host_IP,Hostname,Protocol,Port_ID,State,Service_Name,Product,Version,ExtraInfo,Reason,CPE
+8.8.8.8,dns.google,tcp,53,open,domain,,,,syn-ack,
+8.8.8.8,dns.google,tcp,443,open,https,,,,syn-ack,
+8.8.4.4,dns.google,tcp,53,open,domain,,,,syn-ack,
+8.8.4.4,dns.google,tcp,443,open,https,,,,syn-ack,
