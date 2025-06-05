@@ -61,6 +61,13 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
         # Provide a more specific detail if Nmap is not found.
         if "nmap program was not found" in str(e).lower():
             result_dict["details"] = "Nmap command not found. Please ensure Nmap is installed and in your system's PATH."
+        elif "Error compiling our pcap filter" in str(e):
+            result_dict["details"] = (
+                f"Nmap pcap filter compilation error: {str(e)}. "
+                "This may be due to Nmap lacking necessary permissions (e.g., root or CAP_NET_RAW) "
+                "for the chosen scan type, or a conflict with other packet filtering software. "
+                "Try using a TCP Connect Scan (-sT) or ensure Nmap has appropriate privileges."
+            )
         else:
             result_dict["details"] = str(e)
         # Include scan stats if available even in error, though might be minimal

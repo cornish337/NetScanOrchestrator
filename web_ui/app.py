@@ -39,6 +39,33 @@ def run_scan():
     targets_str = request.form.get('targets', '')
     nmap_options = request.form.get('nmap_options', '-T4 -F') # Default options if not provided
 
+    # Define common Nmap scan type flags
+    scan_type_flags = [
+        "-sS", "-sT", "-sU", "-sA", "-sW", "-sM", # TCP SYN, Connect, UDP, ACK, Window, Maimon
+        "-sP", "-sn", # Ping Scan (older Nmap, use -sn), No Port Scan
+        "-PR", # ARP Ping
+        "-PS", # TCP SYN Ping
+        "-PA", # TCP ACK Ping
+        "-PU", # UDP Ping
+        "-PY"  # SCTP INIT Ping
+    ]
+
+    # Check if any scan type flag is already present in nmap_options
+    # This is a simplified check; robust parsing of nmap options can be complex.
+    # It looks for the flags as standalone words or parts of combined options.
+    # For example, it will find "-sS" in "-T4 -sS -O" and also in "-T4sS -O"
+    # by checking for the presence of the flag string.
+    scan_type_specified = False
+    for flag in scan_type_flags:
+        if flag in nmap_options:
+            scan_type_specified = True
+            break
+
+    if not scan_type_specified:
+        nmap_options = "-sT " + nmap_options
+        app.logger.info(f"No scan type specified. Defaulting to TCP Connect Scan (-sT). New options: '{nmap_options}'")
+
+
     processed_targets = [line.strip() for line in targets_str.splitlines() if line.strip()]
 
     if not processed_targets:
