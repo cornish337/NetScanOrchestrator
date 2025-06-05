@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Nmap Scan Results Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        h1 { color: #0056b3; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin-bottom: 10px; background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        li a { text-decoration: none; color: #007bff; }
+        li a:hover { text-decoration: underline; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .no-files { color: #777; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nmap Scan Results Viewer</h1>
+        <h2>Available JSON Result Files:</h2>
+        <p><em>Displaying files from: {{ RESULTS_DIR_DISPLAY }}</em></p>
+        {% if files %}
+            <ul>
+                {% for file in files %}
+                    <li><a href="{{ url_for('view_results', filename=file) }}">{{ file }}</a></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="no-files">No JSON result files found in '{{ RESULTS_DIR_DISPLAY }}'.</p>
+            <p>To test, run a scan using the main CLI script (e.g., <code>python nmap_parallel_scanner.py -i your_ips.txt -o {{ RESULTS_DIR_DISPLAY }}/my_scan_results --formats json</code>) and ensure JSON output is saved in the configured directory.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
+```

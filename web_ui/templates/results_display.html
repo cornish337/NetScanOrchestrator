@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Scan Results: {{ filename }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background-color: #f9f9f9; color: #333; }
+        .container { max-width: 1200px; margin: 20px auto; padding: 20px; background-color: #fff; box-shadow: 0 0 15px rgba(0,0,0,0.1); border-radius: 8px; }
+        h1, h2, h3, h4, h5 { color: #0056b3; }
+        h1 { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 30px; }
+        .host { border: 1px solid #ccc; margin-bottom: 20px; padding: 15px; border-radius: 5px; background-color: #fff; }
+        .host h3 { margin-top: 0; color: #007bff; }
+        .ports table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        .ports th, .ports td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 0.9em; }
+        .ports th { background-color: #e9ecef; color: #495057; }
+        .ports tr:nth-child(even) { background-color: #f8f9fa; }
+        pre { background-color: #e9ecef; padding: 15px; border: 1px solid #ced4da; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9em; }
+        .back-link { display: inline-block; margin-bottom: 20px; padding: 8px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; }
+        .back-link:hover { background-color: #0056b3; }
+        .error-box { border: 1px solid #dc3545; background-color: #f8d7da; color: #721c24; padding: 15px; margin-top: 20px; border-radius: 4px;}
+        dl dt { font-weight: bold; }
+        dl dd { margin-left: 20px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Scan Results for: <em>{{ filename }}</em></h1>
+        <a href="{{ url_for('index') }}" class="back-link">&larr; Back to List</a>
+
+        <h2>Overall Statistics</h2>
+        {% if data.stats %}
+            <dl>
+            {% for key, value in data.stats.items() %}
+                <dt>{{ key.replace('_', ' ').title() }}</dt>
+                {% if value is mapping or value is list %}
+                    <dd><pre>{{ value | tojson(indent=2) }}</pre></dd>
+                {% else %}
+                    <dd>{{ value }}</dd>
+                {% endif %}
+            {% endfor %}
+            </dl>
+        {% else %}
+            <p>No overall statistics available.</p>
+        {% endif %}
+
+        <h2>Hosts ({{ data.hosts | default({}, true) | length }})</h2>
+        {% if data.hosts %}
+            {% for ip, host_details in data.hosts.items() %}
+                <div class="host">
+                    <h3>Host: {{ ip }}</h3>
+                    {% if host_details.hostnames %}
+                        <p><strong>Hostnames:</strong>
+                        {% for hn in host_details.hostnames %}
+                            {{ hn.name if hn.name else 'N/A' }} ({{ hn.type if hn.type else 'N/A' }}){% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        </p>
+                    {% endif %}
+
+                    <p><strong>Status:</strong> {{ host_details.status.state | default('N/A') }} (Reason: {{ host_details.status.reason | default('N/A') }})</p>
+
+                    {% set has_protocol_data = false %}
+                    {% for proto_key in ['tcp', 'udp', 'sctp', 'ip'] %} {# Iterate specific protocols to control order and ensure checks #}
+                        {% if host_details[proto_key] is defined and host_details[proto_key] %}
+                            {% set has_protocol_data = true %}
+                            <h5>{{ proto_key | upper }} Ports</h5>
+                            <div class="ports">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Port ID</th>
+                                            <th>State</th>
+                                            <th>Service Name</th>
+                                            <th>Product</th>
+                                            <th>Version</th>
+                                            <th>ExtraInfo</th>
+                                            <th>Reason</th>
+                                            <th>CPE</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for port_id, port_data in host_details[proto_key].items() %}
+                                    <tr>
+                                        <td>{{ port_id }}</td>
+                                        <td>{{ port_data.state | default('N/A') }}</td>
+                                        <td>{{ port_data.name | default('N/A') }}</td>
+                                        <td>{{ port_data.product | default('N/A') }}</td>
+                                        <td>{{ port_data.version | default('N/A') }}</td>
+                                        <td>{{ port_data.extrainfo | default('N/A') }}</td>
+                                        <td>{{ port_data.reason | default('N/A') }}</td>
+                                        <td>{{ port_data.cpe | default('', true) }}</td> {# CPE can be empty string #}
+                                    </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if not has_protocol_data %}
+                        <p>No open ports or specific protocol information found for this host under TCP, UDP, SCTP, or IP.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No host details found in this scan result.</p>
+        {% endif %}
+
+        {% if data.errors %}
+            <h2 class="error-box-title">Errors Encountered During Scan</h2>
+            <div class="error-box">
+                <pre>{{ data.errors | tojson(indent=2) }}</pre>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+```
