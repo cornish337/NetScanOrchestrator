@@ -1,0 +1,22 @@
+# Example IP Addresses and Ranges for Nmap Parallel Scanner
+# Lines starting with # will be treated as hostnames by Nmap
+# if not filtered by an input processing function.
+# Our current ip_handler.read_ips_from_file does not filter them.
+# For a "clean" functional example, ensure only valid targets are listed without leading comments.
+# This example file is intended to be clean for direct use.
+
+# Publicly scannable host (Nmap's test site)
+scanme.nmap.org
+
+# Google's Public DNS Servers
+8.8.8.8
+8.8.4.4
+
+# A small CIDR range
+# Using scanme.nmap.org's /30 block for demonstration.
+# (45.33.32.156, 45.33.32.157, 45.33.32.158, 45.33.32.159)
+45.33.32.156/30
+
+# Hyphenated range (using a small part of Google's DNS range for safety)
+8.8.8.1-8.8.8.3
+```
