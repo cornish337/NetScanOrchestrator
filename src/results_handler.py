@@ -5,8 +5,8 @@ import json
 import csv
 import os
 import xml.etree.ElementTree as ET
-from xml.dom import minidom # For pretty printing
-from typing import List, Dict, Any
+from xml.dom import minidom
+from typing import List, Dict, Any, Set # Added Set
 
 def consolidate_scan_results(scan_results_list: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -21,90 +21,101 @@ def consolidate_scan_results(scan_results_list: List[Dict[str, Any]]) -> Dict[st
         their details, and any errors encountered during scans.
     """
     consolidated: Dict[str, Any] = {
-        "hosts": {}, # Keyed by IP address
-        "errors": [],
+        "hosts": {}, # Keyed by IP address for successfully scanned hosts with data
+        "errors": [], # Stores error objects/details from chunks that failed scan execution
         "stats": {
             "total_chunks": len(scan_results_list),
-            "successful_chunks": 0,
-            "failed_chunks": 0,
-            "total_hosts_processed_in_chunks": 0, # Sum of 'totalhosts' from scanstats if available
-            "total_hosts_up_in_chunks": 0, # Sum of 'uphosts' from scanstats
-            "individual_chunk_reports": [] # To store messages like "all hosts down"
+            "successful_chunks": 0, # Chunks that ran without raising a major Nmap execution error
+            "failed_chunks": 0,     # Chunks that had an Nmap execution error (e.g., nmap not found)
+            "total_input_targets_processed": 0, # Sum of unique targets across all input_targets lists
+            "total_hosts_up_reported_by_nmap": 0, # Sum of 'uphosts' from nmap's scanstats across chunks
+            "all_intended_ips": [],
+            "successfully_scanned_ips": [], # IPs for which we have actual scan data in consolidated['hosts']
+            "ips_in_failed_chunks": [], # IPs from chunks that had an error during scan execution
+            "unscanned_or_error_ips": [], # IPs that were intended but not in successfully_scanned_ips
+            "individual_chunk_reports": [] # Detailed report for each chunk's outcome
         }
     }
 
+    all_intended_ips_set: Set[str] = set()
+    successfully_scanned_ips_set: Set[str] = set() # Hosts for which nmap returned scan data
+    ips_in_failed_chunks_set: Set[str] = set()   # Input targets from chunks that failed entirely
+
     for i, result_chunk in enumerate(scan_results_list):
-        chunk_report_summary = {"chunk_index": i}
+        # result_chunk is a dict from run_nmap_scan, includes 'input_targets'
+        current_chunk_input_targets = result_chunk.get("input_targets", [])
+        all_intended_ips_set.update(current_chunk_input_targets)
+
+        chunk_report: Dict[str, Any] = {
+            "chunk_index": i,
+            "input_targets": current_chunk_input_targets,
+            "status": "Unknown", # Will be updated to "Successful" or "Failed" (scan execution context)
+            "nmap_command_line": result_chunk.get("nmap", {}).get("command_line", "") or result_chunk.get("command_line", "")
+        }
 
         if result_chunk.get("error"):
-            # This is for errors from run_nmap_scan or parallel_scanner itself
-            error_detail = {
-                "type": "scan_execution_error",
+            # This means the scan for this chunk failed (e.g., nmap not found, critical error)
+            consolidated["errors"].append({
                 "chunk_index": i,
-                "error_message": result_chunk.get("error"),
-                "details": result_chunk.get("details")
-            }
-            consolidated["errors"].append(error_detail)
+                "error_type": result_chunk.get("error"), # e.g., "Nmap execution failed."
+                "details": result_chunk.get("details"),
+                "input_targets": current_chunk_input_targets
+            })
             consolidated["stats"]["failed_chunks"] += 1
-            chunk_report_summary["status"] = "failed"
-            chunk_report_summary["error"] = result_chunk.get("error")
-            consolidated["stats"]["individual_chunk_reports"].append(chunk_report_summary)
-            continue
+            ips_in_failed_chunks_set.update(current_chunk_input_targets)
+            chunk_report["status"] = "Failed"
+            chunk_report["error_message"] = result_chunk.get("error")
+            if result_chunk.get("details"):
+                 chunk_report["error_details"] = result_chunk.get("details")
+        else:
+            # Chunk execution was "successful" (Nmap ran), but individual hosts might be down or filtered.
+            consolidated["stats"]["successful_chunks"] += 1
+            chunk_report["status"] = "Successful" # Nmap command executed
 
-        consolidated["stats"]["successful_chunks"] += 1
-        chunk_report_summary["status"] = "successful"
+            # Message from run_nmap_scan (e.g., "All hosts are down")
+            if result_chunk.get("message"):
+                chunk_report["message"] = result_chunk.get("message")
 
-        # The structure of `result_chunk` is typically what nmap.PortScanner().scan() returns
-        # e.g., {'nmap': {...}, 'scan': {'127.0.0.1': {...}, ...}, 'command_line': '...', ...}
-        # It can also be our custom error dict or status dict for "all hosts down".
+            # Process actual scan data for hosts if present
+            scan_data = result_chunk.get('scan', {}) # This is {'ip1': {...}, 'ip2': {...}}
+            for host_ip, host_data in scan_data.items():
+                successfully_scanned_ips_set.add(host_ip) # These are actual IPs nmap provided data for
+                if host_ip not in consolidated["hosts"]:
+                    consolidated["hosts"][host_ip] = host_data
+                else:
+                    # Simple merge: update existing host_data.
+                    consolidated["hosts"][host_ip].update(host_data)
 
-        scan_data = result_chunk.get('scan', {}) # This is the main dictionary of host results
+            # Aggregate 'uphosts' from nmap's scanstats for this chunk
+            chunk_nmap_stats = result_chunk.get('stats', {}) # This is from nmap.scanstats()
+            if chunk_nmap_stats:
+                chunk_report["scanstats"] = chunk_nmap_stats # Add to individual chunk report
+                try:
+                    consolidated["stats"]["total_hosts_up_reported_by_nmap"] += int(chunk_nmap_stats.get('uphosts', '0'))
+                except ValueError:
+                    print(f"Warning: Could not parse 'uphosts' from scanstats for chunk {i}: {chunk_nmap_stats.get('uphosts')}")
 
-        # Handle cases from run_nmap_scan where scan ran but no hosts were up / no data
-        if result_chunk.get("status") == "completed" and "message" in result_chunk:
-            chunk_report_summary["message"] = result_chunk["message"]
-            # Store this information, as scan_data might be empty
-            # Example: "All specified hosts are down or did not respond."
-
-        if not scan_data and not result_chunk.get("error"):
-             # This means the 'scan' dict was empty, but no explicit "error" key from run_nmap_scan
-             # Could be due to all hosts down, or specific nmap options.
-             # The message from run_nmap_scan (if any) is already added to chunk_report_summary.
-             pass
-
-
-        for host_ip, host_data in scan_data.items():
-            if host_ip not in consolidated["hosts"]:
-                consolidated["hosts"][host_ip] = host_data
-            else:
-                # Simple merge: update existing host_data.
-                # More sophisticated merging might be needed if scans on the same host
-                # were run with different options across chunks (not typical for this tool's design).
-                # For now, update should be fine, assuming host_data is comprehensive for that host.
-                consolidated["hosts"][host_ip].update(host_data)
-
-        # Aggregate stats from nmap.scanstats() if present in the result chunk
-        # (as returned by our modified run_nmap_scan)
-        chunk_scan_stats = result_chunk.get('stats', {}) # This 'stats' is from nmap's scanstats
-        if chunk_scan_stats:
-            chunk_report_summary["scanstats"] = chunk_scan_stats
-            try:
-                consolidated["stats"]["total_hosts_processed_in_chunks"] += int(chunk_scan_stats.get('totalhosts', '0'))
-                consolidated["stats"]["total_hosts_up_in_chunks"] += int(chunk_scan_stats.get('uphosts', '0'))
-            except ValueError:
-                print(f"Warning: Could not parse scanstats numbers for chunk {i}: {chunk_scan_stats}")
-
-        # Add command line if present
-        if 'command_line' in result_chunk.get('nmap', {}):
-            chunk_report_summary["command_line"] = result_chunk['nmap']['command_line']
-        elif 'command_line' in result_chunk: # if directly in result
-             chunk_report_summary["command_line"] = result_chunk['command_line']
+            # If a chunk is "successful" in execution but scan_data is empty (e.g. all hosts down, or filtered by nmap options)
+            # these IPs were processed by Nmap. They are not "successfully_scanned_ips" if 'scan' dict is empty for them.
+            if not scan_data and not result_chunk.get("message"): # If no specific message like "all down"
+                 chunk_report["message"] = chunk_report.get("message", "Nmap ran but returned no scan data for any host in this chunk.")
 
 
-        consolidated["stats"]["individual_chunk_reports"].append(chunk_report_summary)
+        consolidated["stats"]["individual_chunk_reports"].append(chunk_report)
 
-    # Final derived stats
-    consolidated["stats"]["total_unique_hosts_found"] = len(consolidated["hosts"])
+    # Populate the stats based on collected sets and counts
+    consolidated["stats"]["all_intended_ips"] = sorted(list(all_intended_ips_set))
+    consolidated["stats"]["total_input_targets_processed"] = len(all_intended_ips_set) # Count of unique IPs from input
+
+    consolidated["stats"]["successfully_scanned_ips"] = sorted(list(successfully_scanned_ips_set))
+    consolidated["stats"]["total_unique_hosts_found"] = len(successfully_scanned_ips_set) # Renamed from previous version for clarity
+
+    consolidated["stats"]["ips_in_failed_chunks"] = sorted(list(ips_in_failed_chunks_set))
+
+    # Unscanned or error IPs are those intended but not in the 'successfully_scanned_ips_set'.
+    # This includes hosts that were down, filtered, or part of chunks that failed execution (though ips_in_failed_chunks also lists the latter).
+    unscanned_or_error_ips_set = all_intended_ips_set - successfully_scanned_ips_set
+    consolidated["stats"]["unscanned_or_error_ips"] = sorted(list(unscanned_or_error_ips_set))
 
     return consolidated
 
