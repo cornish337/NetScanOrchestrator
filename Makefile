@@ -1,6 +1,6 @@
 # Makefile for nmap-parallel-scanner
 
-.PHONY: help install build-docker run-docker-scan run-cli-scan start-webui lint test clean
+.PHONY: help install build-docker run-docker-scan run-cli-scan start-webui start-docker-webui stop-docker-webui lint test clean
 
 # Default target when 'make' is run without arguments
 help:
@@ -11,7 +11,9 @@ help:
 	@echo "  build-docker     - Build the Docker image."
 	@echo "  run-docker-scan  - Run a sample Nmap scan using Docker. (Edit params in Makefile first)"
 	@echo "  run-cli-scan     - Run a sample Nmap scan using the local Python script. (Edit params in Makefile first)"
-	@echo "  start-webui      - Start the local Flask web UI."
+	@echo "  start-webui      - Start the local Flask web UI (runs directly with local Python)."
+	@echo "  start-docker-webui - Start the Web UI in a Docker container."
+	@echo "  stop-docker-webui  - Stop the Docker Web UI container."
 	@echo "  lint             - Run linters (placeholder)."
 	@echo "  test             - Run tests (placeholder)."
 	@echo "  clean            - Remove Python cache files and other temporary files."
@@ -22,7 +24,7 @@ help:
 # Configuration for scan commands (customize as needed)
 INPUT_FILE ?= data/sample_inputs/example_ips.txt
 OUTPUT_PREFIX ?= data/cli_outputs/make_scan_results
-NMAP_OPTIONS ?= "-T4 -F"
+NMAP_OPTIONS ?= -T4 -F
 FORMATS ?= json,csv,md
 
 # Check if virtual environment is activated, otherwise use system python/pip
@@ -36,7 +38,7 @@ install:
 
 build-docker:
 	@echo "Building Docker image 'nmap_parallel_scanner'..."
-	docker build -t nmap_parallel_scanner .
+	docker build $(DOCKER_BUILD_OPTIONS) -t nmap_parallel_scanner .
 	@echo "Docker image built."
 
 run-docker-scan:
@@ -79,3 +81,19 @@ clean:
 	rm -rf htmlcov
 	rm -f .coverage
 	@echo "Clean up complete."
+
+start-docker-webui:
+	@echo "Starting Web UI in Docker..."
+	mkdir -p data/cli_outputs # Ensure output directory exists on host for volume mount
+	docker run -d --rm --name nmap_webui -p 5000:5000 \
+		-v "$(CURDIR)/data/cli_outputs:/app/data/cli_outputs" \
+		-v "$(CURDIR)/data/sample_inputs:/app/data/sample_inputs" \
+		--entrypoint python nmap_parallel_scanner web_ui/app.py
+	@echo "Web UI should be accessible at http://localhost:5000 (ensure results are in data/cli_outputs)"
+	@echo "To view logs: docker logs nmap_webui"
+	@echo "To stop: make stop-docker-webui"
+
+stop-docker-webui:
+	@echo "Stopping Web UI Docker container (nmap_webui)..."
+	docker stop nmap_webui
+	@echo "Container nmap_webui stopped."

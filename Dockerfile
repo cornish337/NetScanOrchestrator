@@ -43,4 +43,3 @@ ENTRYPOINT ["/usr/bin/tini", "--", "python", "nmap_parallel_scanner.py"]
 # Default command if no arguments are provided to 'docker run <image_name>'
 # This will show the help message for the nmap_parallel_scanner.py script.
 CMD ["--help"]
-```

@@ -1,0 +1,166 @@
+{
+    "hosts": {
+        "8.8.8.8": {
+            "hostnames": [
+                {
+                    "name": "dns.google",
+                    "type": "PTR"
+                }
+            ],
+            "addresses": {
+                "ipv4": "8.8.8.8"
+            },
+            "vendor": {},
+            "status": {
+                "state": "up",
+                "reason": "echo-reply"
+            },
+            "tcp": {
+                "53": {
+                    "state": "open",
+                    "reason": "syn-ack",
+                    "name": "domain",
+                    "product": "",
+                    "version": "",
+                    "extrainfo": "",
+                    "conf": "3",
+                    "cpe": ""
+                },
+                "443": {
+                    "state": "open",
+                    "reason": "syn-ack",
+                    "name": "https",
+                    "product": "",
+                    "version": "",
+                    "extrainfo": "",
+                    "conf": "3",
+                    "cpe": ""
+                }
+            }
+        },
+        "8.8.4.4": {
+            "hostnames": [
+                {
+                    "name": "dns.google",
+                    "type": "PTR"
+                }
+            ],
+            "addresses": {
+                "ipv4": "8.8.4.4"
+            },
+            "vendor": {},
+            "status": {
+                "state": "up",
+                "reason": "syn-ack"
+            },
+            "tcp": {
+                "53": {
+                    "state": "open",
+                    "reason": "syn-ack",
+                    "name": "domain",
+                    "product": "",
+                    "version": "",
+                    "extrainfo": "",
+                    "conf": "3",
+                    "cpe": ""
+                },
+                "443": {
+                    "state": "open",
+                    "reason": "syn-ack",
+                    "name": "https",
+                    "product": "",
+                    "version": "",
+                    "extrainfo": "",
+                    "conf": "3",
+                    "cpe": ""
+                }
+            }
+        }
+    },
+    "errors": [],
+    "stats": {
+        "total_chunks": 2,
+        "successful_chunks": 2,
+        "failed_chunks": 0,
+        "total_input_targets_processed": 18,
+        "total_hosts_up_reported_by_nmap": 0,
+        "all_intended_ips": [
+            "# (45.33.32.156, 45.33.32.157, 45.33.32.158, 45.33.32.159)",
+            "# A small CIDR range",
+            "# Example IP Addresses and Ranges for Nmap Parallel Scanner",
+            "# For a \"clean\" functional example, ensure only valid targets are listed without leading comments.",
+            "# Google's Public DNS Servers",
+            "# Hyphenated range (using a small part of Google's DNS range for safety)",
+            "# Lines starting with # will be treated as hostnames by Nmap",
+            "# Our current ip_handler.read_ips_from_file does not filter them.",
+            "# Publicly scannable host (Nmap's test site)",
+            "# This example file is intended to be clean for direct use.",
+            "# Using scanme.nmap.org's /30 block for demonstration.",
+            "# if not filtered by an input processing function.",
+            "45.33.32.156/30",
+            "8.8.4.4",
+            "8.8.8.1-8.8.8.3",
+            "8.8.8.8",
+            "```",
+            "scanme.nmap.org"
+        ],
+        "successfully_scanned_ips": [
+            "8.8.4.4",
+            "8.8.8.8"
+        ],
+        "ips_in_failed_chunks": [],
+        "unscanned_or_error_ips": [
+            "# (45.33.32.156, 45.33.32.157, 45.33.32.158, 45.33.32.159)",
+            "# A small CIDR range",
+            "# Example IP Addresses and Ranges for Nmap Parallel Scanner",
+            "# For a \"clean\" functional example, ensure only valid targets are listed without leading comments.",
+            "# Google's Public DNS Servers",
+            "# Hyphenated range (using a small part of Google's DNS range for safety)",
+            "# Lines starting with # will be treated as hostnames by Nmap",
+            "# Our current ip_handler.read_ips_from_file does not filter them.",
+            "# Publicly scannable host (Nmap's test site)",
+            "# This example file is intended to be clean for direct use.",
+            "# Using scanme.nmap.org's /30 block for demonstration.",
+            "# if not filtered by an input processing function.",
+            "45.33.32.156/30",
+            "8.8.8.1-8.8.8.3",
+            "```",
+            "scanme.nmap.org"
+        ],
+        "individual_chunk_reports": [
+            {
+                "chunk_index": 0,
+                "input_targets": [
+                    "# Example IP Addresses and Ranges for Nmap Parallel Scanner",
+                    "# Lines starting with # will be treated as hostnames by Nmap",
+                    "# if not filtered by an input processing function.",
+                    "# Our current ip_handler.read_ips_from_file does not filter them.",
+                    "# For a \"clean\" functional example, ensure only valid targets are listed without leading comments.",
+                    "# This example file is intended to be clean for direct use.",
+                    "# Publicly scannable host (Nmap's test site)",
+                    "scanme.nmap.org",
+                    "# Google's Public DNS Servers",
+                    "8.8.8.8"
+                ],
+                "status": "Successful",
+                "nmap_command_line": "nmap -oX - -T4 -F # Example IP Addresses and Ranges for Nmap Parallel Scanner # Lines starting with # will be treated as hostnames by Nmap # if not filtered by an input processing function. # Our current ip_handler.read_ips_from_file does not filter them. # For a clean functional example, ensure only valid targets are listed without leading comments. # This example file is intended to be clean for direct use. # Publicly scannable host \"(Nmaps test site) scanme.nmap.org # Googles\" Public DNS Servers 8.8.8.8"
+            },
+            {
+                "chunk_index": 1,
+                "input_targets": [
+                    "8.8.4.4",
+                    "# A small CIDR range",
+                    "# Using scanme.nmap.org's /30 block for demonstration.",
+                    "# (45.33.32.156, 45.33.32.157, 45.33.32.158, 45.33.32.159)",
+                    "45.33.32.156/30",
+                    "# Hyphenated range (using a small part of Google's DNS range for safety)",
+                    "8.8.8.1-8.8.8.3",
+                    "```"
+                ],
+                "status": "Successful",
+                "nmap_command_line": "nmap -oX - -T4 -F 8.8.4.4 # A small CIDR range # Using \"scanme.nmap.orgs /30 block for demonstration. # (45.33.32.156, 45.33.32.157, 45.33.32.158, 45.33.32.159) 45.33.32.156/30 # Hyphenated range (using a small part of Googles\" DNS range for safety) 8.8.8.1-8.8.8.3 ```"
+            }
+        ],
+        "total_unique_hosts_found": 2
+    }
+}
