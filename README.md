@@ -161,6 +161,29 @@ The web UI is a simple Flask application to view *previously generated JSON resu
 
     If running the main application (CLI scanner) via Docker, the web UI is not automatically started as part of that `docker run` command. You would need to run the web UI separately, potentially in another Docker container with access to the JSON output volume, or on your host machine if it can access the JSON files.
 
+## Testing
+
+The project includes both unit tests (for individual modules) and integration tests (for the CLI tool).
+
+**Running Tests:**
+
+1.  Ensure you have followed the **Local Setup** instructions and activated your virtual environment.
+2.  From the project root directory, run the following command to discover and execute all tests in the `tests/` directory:
+
+    ```bash
+    python -m unittest discover tests
+    ```
+
+    Or, to run a specific test file:
+    ```bash
+    python -m unittest tests.test_ip_handler
+    python -m unittest tests.test_cli_integration
+    ```
+
+**Notes on Integration Tests:**
+- The CLI integration test (`tests/test_cli_integration.py`) performs a live Nmap scan against an external host (`scanme.nmap.org`). This test may take a few minutes to complete.
+- This live test is automatically skipped when running in GitHub Actions environments to prevent potential flakiness or network policy issues.
+
 ## Output Formats
 
 The scanner can generate reports in the following formats:
