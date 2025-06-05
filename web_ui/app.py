@@ -1,8 +1,22 @@
 import os
 import json
-from flask import Flask, render_template, abort, url_for
+from flask import Flask, render_template, abort, url_for, request, redirect, flash # Added request, redirect, flash
+import datetime # Added datetime
+from multiprocessing import cpu_count # Added cpu_count
+
+# Assuming src is in python path or adjust sys.path if running directly and not as package
+# For a packaged app, these imports should work if src is a package
+# Adjusting sys.path for local development if 'src' is not installed as a package
+import sys
+PROJECT_ROOT_FOR_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, PROJECT_ROOT_FOR_SRC)
+from src.ip_handler import chunk_ips # read_ips_from_file might not be directly used for textarea
+from src.parallel_scanner import scan_chunks_parallel
+from src.results_handler import consolidate_scan_results, to_json
+
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24) # Needed for flash messages
 
 # Assuming output files are stored in a directory like 'data/cli_outputs'
 # relative to the project root.
@@ -18,6 +32,52 @@ def inject_results_dir():
     # Making it relative to project root for display:
     display_results_dir = os.path.relpath(RESULTS_DIR, PROJECT_ROOT)
     return dict(RESULTS_DIR_DISPLAY=display_results_dir)
+
+
+@app.route('/scan', methods=['POST'])
+def run_scan():
+    targets_str = request.form.get('targets', '')
+    nmap_options = request.form.get('nmap_options', '-T4 -F') # Default options if not provided
+
+    processed_targets = [line.strip() for line in targets_str.splitlines() if line.strip()]
+
+    if not processed_targets:
+        flash('No targets provided. Please enter at least one IP address or hostname.', 'error')
+        return redirect(url_for('index'))
+
+    # Ensure RESULTS_DIR exists
+    if not os.path.exists(RESULTS_DIR):
+        try:
+            os.makedirs(RESULTS_DIR)
+        except OSError as e:
+            app.logger.error(f"Error creating results directory {RESULTS_DIR}: {e}")
+            flash(f"Server error: Could not create results directory. {e}", 'error')
+            return redirect(url_for('index'))
+
+    # Chunk IPs
+    # Using a default chunk size similar to nmap_parallel_scanner.py, can be made configurable
+    ip_chunks = chunk_ips(processed_targets, chunk_size=10)
+
+    num_processes = cpu_count() or 1
+
+    try:
+        app.logger.info(f"Starting scan for targets: {processed_targets} with options: '{nmap_options}' using {num_processes} processes.")
+        raw_scan_results = scan_chunks_parallel(ip_chunks, nmap_options, num_processes)
+        consolidated_data = consolidate_scan_results(raw_scan_results)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_filename = f"scan_results_{timestamp}.json"
+        output_filepath = os.path.join(RESULTS_DIR, new_filename)
+
+        to_json(consolidated_data, output_filepath) # This function prints to console
+        app.logger.info(f"Scan results saved to {output_filepath}")
+        flash(f"Scan complete! Results saved to {new_filename}", 'success')
+        return redirect(url_for('view_results', filename=new_filename))
+
+    except Exception as e:
+        app.logger.error(f"Error during scan process: {e}", exc_info=True) # Log stack trace
+        flash(f"An error occurred during the scan: {e}", 'error')
+        return redirect(url_for('index'))
 
 
 @app.route('/')
@@ -86,5 +146,6 @@ if __name__ == '__main__':
 
     print(f"Flask app running. Access at http://127.0.0.1:5000")
     print(f"Serving results from: {os.path.abspath(RESULTS_DIR)}")
-    app.run(debug=True, host='0.0.0.0') # Listen on all interfaces for easier access if in a VM/container
+    # Note: app.run() is only for development. For production, use a WSGI server like Gunicorn.
+    app.run(debug=True, host='0.0.0.0', port=5000) # Listen on all interfaces for easier access if in a VM/container. Explicit port.
 ```

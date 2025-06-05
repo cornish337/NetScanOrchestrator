@@ -1,3 +1,4 @@
+
 # Nmap Parallel Scanner
 
 Nmap Parallel Scanner is a Python-based framework designed to run Nmap scans against a large number of IP addresses or ranges in parallel. It breaks down the target list into smaller chunks, executes Nmap scans concurrently, and then consolidates the results. This approach helps in efficiently scanning large networks and quickly identifying responsive hosts and open ports, especially when some targets might significantly slow down a monolithic scan.
@@ -48,10 +49,32 @@ The Nmap Parallel Scanner consists of several core components:
     ```
 
 3.  **Install dependencies:**
+
     ```bash
     pip install -r requirements.txt
     ```
 
+
+## Usage
+
+1.  Start the Flask web server:
+    ```bash
+    python web_ui/app.py
+    ```
+2.  Open your web browser and navigate to `http://127.0.0.1:5000`.
+3.  Enter the IP addresses or hostnames to scan and click "Scan".
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/your-feature-name`).
+3.  Make your changes.
+4.  Commit your changes (`git commit -am 'Add some feature'`).
+5.  Push to the branch (`git push origin feature/your-feature-name`).
+6.  Create a new Pull Request.
+=======
 ### Docker Setup
 
 **Prerequisites:**
@@ -215,3 +238,4 @@ If you see IPs in the "IPs without scan data" or "IPs from chunks with execution
 
 This project aims to provide a flexible and efficient way to conduct large-scale network reconnaissance.
 ```
+

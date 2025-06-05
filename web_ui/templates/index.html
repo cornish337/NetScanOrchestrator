@@ -6,6 +6,12 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
         h1 { color: #0056b3; }
+        /* ... other styles ... */
+        .form-section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        label { display: block; margin-top: 10px; margin-bottom: 5px; font-weight: bold; }
+        textarea, input[type='text'] { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input[type='submit'] { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        input[type='submit']:hover { background-color: #0056b3; }
         ul { list-style-type: none; padding: 0; }
         li { margin-bottom: 10px; background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
         li a { text-decoration: none; color: #007bff; }
@@ -16,7 +22,29 @@
 </head>
 <body>
     <div class="container">
-        <h1>Nmap Scan Results Viewer</h1>
+        <h1>Nmap Parallel Scanner</h1> <!-- Changed title slightly -->
+
+        <!-- New Scan Form Section -->
+        <div class="form-section">
+            <h2>Start a New Scan</h2>
+            <form action="{{ url_for('run_scan') }}" method="POST">
+                <div>
+                    <label for="targets">Target IPs/Hostnames (one per line):</label>
+                    <textarea name="targets" id="targets" rows="5" required placeholder="e.g.
+scanme.nmap.org
+192.168.1.0/24
+example.com"></textarea>
+                </div>
+                <div>
+                    <label for="nmap_options">Nmap Options:</label>
+                    <input type="text" name="nmap_options" id="nmap_options" value="-T4 -F" required placeholder="e.g. -T4 -A -v">
+                </div>
+                <div>
+                    <input type="submit" value="Start Scan">
+                </div>
+            </form>
+        </div>
+
         <h2>Available JSON Result Files:</h2>
         <p><em>Displaying files from: {{ RESULTS_DIR_DISPLAY }}</em></p>
         {% if files %}
