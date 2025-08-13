@@ -123,4 +123,3 @@ if __name__ == "__main__":
     # This allows running the tests directly from this file: python tests/test_ip_handler.py
     # It's also discoverable by `python -m unittest discover tests` from project root.
     unittest.main()
-```
