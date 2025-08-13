@@ -54,7 +54,7 @@ def main():
     )
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO) # Console output is less verbose
+    console_handler.setLevel(logging.DEBUG) # Console output is less verbose
     formatter = logging.Formatter('%(levelname)s: %(message)s')
     console_handler.setFormatter(formatter)
     logging.getLogger('').addHandler(console_handler)

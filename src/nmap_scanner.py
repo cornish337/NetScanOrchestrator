@@ -21,10 +21,15 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
     result_dict: Dict[str, Any] = {"input_targets": targets}
 
     try:
+        # Construct the command string for logging, mimicking python-nmap's behavior.
+        # python-nmap adds '-oX -' to parse the output.
+        command = f"nmap -oX - {options} {target_string}"
+        logging.debug(f"Attempting to run Nmap command: {command}")
+
         # The scan method of python-nmap executes nmap and parses XML output.
-        logging.debug(f"Executing Nmap with targets: '{target_string}' and options: '{options}'")
         scan_output = nm.scan(hosts=target_string, arguments=options)
-        logging.debug(f"Nmap command executed: '{nm.command_line()}'")
+        logging.debug(f"Nmap command finished successfully. Full command executed: '{nm.command_line()}'")
+
 
         # Merge the raw scan_output into our result_dict.
         # scan_output structure is typically {'nmap': {...}, 'scan': {host1:..., host2:...}}
