@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import logging
 from multiprocessing import cpu_count
 
 # Adjust path to import from src, assuming the script is in the root
@@ -44,6 +45,21 @@ from results_handler import (
 )
 
 def main():
+    # Setup logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        filename='nmap_debug.log',
+        filemode='w'
+    )
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO) # Console output is less verbose
+    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    console_handler.setFormatter(formatter)
+    logging.getLogger('').addHandler(console_handler)
+
+
     parser = argparse.ArgumentParser(
         description="Parallel Nmap Scanner: Conducts Nmap scans in parallel on a list of targets.",
         formatter_class=argparse.RawTextHelpFormatter # Allows for better formatting of help messages
@@ -110,86 +126,86 @@ def main():
             output_dir = "" # Reset output_dir so files are created in CWD with full prefix.
             # args.output_prefix remains as is, to be used as prefix.
 
-    print(f"Starting Nmap Parallel Scanner with the following settings:")
-    print(f"  Input file:      {args.input_file}")
-    print(f"  Output prefix:   {os.path.abspath(args.output_prefix)}") # Show absolute path for clarity
-    print(f"  Output formats:  {args.formats}")
-    print(f"  Chunk size:      {args.chunk_size}")
-    print(f"  Num processes:   {args.num_processes}")
-    print(f"  Nmap options:    '{args.nmap_options}'") # Quoted for clarity
-    print("-" * 40)
+    logging.info("Starting Nmap Parallel Scanner with the following settings:")
+    logging.info(f"  Input file:      {args.input_file}")
+    logging.info(f"  Output prefix:   {os.path.abspath(args.output_prefix)}")
+    logging.info(f"  Output formats:  {args.formats}")
+    logging.info(f"  Chunk size:      {args.chunk_size}")
+    logging.info(f"  Num processes:   {args.num_processes}")
+    logging.info(f"  Nmap options:    '{args.nmap_options}'")
+    logging.info("-" * 40)
 
     # 1. Read IPs
-    print(f"Step 1/5: Reading IPs from '{args.input_file}'...")
+    logging.info(f"Step 1/5: Reading IPs from '{args.input_file}'...")
     ips_to_scan = read_ips_from_file(args.input_file)
     if not ips_to_scan:
-        return # read_ips_from_file prints its own error
-    print(f"          Found {len(ips_to_scan)} IP(s)/range(s).")
+        return  # read_ips_from_file prints its own error
+    logging.info(f"          Found {len(ips_to_scan)} IP(s)/range(s).")
 
     # 2. Chunk IPs
-    print(f"Step 2/5: Chunking IPs into groups of {args.chunk_size}...")
+    logging.info(f"Step 2/5: Chunking IPs into groups of {args.chunk_size}...")
     ip_chunks = chunk_ips(ips_to_scan, chunk_size=args.chunk_size, custom_ranges=None)
     if not ip_chunks:
-        print("          No IP chunks to scan (input list might have been empty after processing). Exiting.")
+        logging.info("          No IP chunks to scan (input list might have been empty after processing). Exiting.")
         return
-    print(f"          Created {len(ip_chunks)} chunk(s).")
+    logging.info(f"          Created {len(ip_chunks)} chunk(s).")
 
     # 3. Run scans in parallel
-    print(f"Step 3/5: Starting Nmap scans for {len(ip_chunks)} chunk(s) using {args.num_processes} parallel process(es)...")
-    print(f"          Nmap options for scan: '{args.nmap_options}'")
+    logging.info(f"Step 3/5: Starting Nmap scans for {len(ip_chunks)} chunk(s) using {args.num_processes} parallel process(es)...")
+    logging.info(f"          Nmap options for scan: '{args.nmap_options}'")
     raw_scan_results = scan_chunks_parallel(ip_chunks, args.nmap_options, args.num_processes)
 
     if not raw_scan_results:
-        print("          Parallel scanning returned no results. This might indicate an issue with the parallel processing setup or that all scan jobs failed very early. Exiting.")
+        logging.warning("Parallel scanning returned no results. This might indicate an issue with the parallel processing setup or that all scan jobs failed very early. Exiting.")
         return
 
     all_failed = all(isinstance(r, dict) and r.get("error") for r in raw_scan_results)
     if all_failed:
-        print("          Warning: All scan chunks resulted in errors. Nmap might not be installed or accessible by subprocesses, or options might be invalid.")
+        logging.warning("All scan chunks resulted in errors. Nmap might not be installed or accessible by subprocesses, or options might be invalid.")
     else:
-        print("          Parallel scanning phase complete.")
+        logging.info("Parallel scanning phase complete.")
 
     # 4. Consolidate results
-    print("Step 4/5: Consolidating scan results...")
+    logging.info("Step 4/5: Consolidating scan results...")
     consolidated_data = consolidate_scan_results(raw_scan_results)
 
     # Display new scan management information
     stats = consolidated_data.get("stats", {})
-    print("\n--- Scan Coverage & Status ---")
-    print(f"  Total unique IPs/targets provided:         {len(stats.get('all_intended_ips', []))}")
+    logging.info("\n--- Scan Coverage & Status ---")
+    logging.info(f"  Total unique IPs/targets provided:         {len(stats.get('all_intended_ips', []))}")
     # Uncomment to list all intended IPs if desired, can be very long.
-    # print(f"    Intended IPs: {stats.get('all_intended_ips', [])}")
-    print(f"  IPs with scan data (hosts found):        {len(stats.get('successfully_scanned_ips', []))}")
-    # print(f"    Successfully Scanned IPs: {stats.get('successfully_scanned_ips', [])}")
+    # logging.info(f"    Intended IPs: {stats.get('all_intended_ips', [])}")
+    logging.info(f"  IPs with scan data (hosts found):        {len(stats.get('successfully_scanned_ips', []))}")
+    # logging.info(f"    Successfully Scanned IPs: {stats.get('successfully_scanned_ips', [])}")
 
     unscanned_or_error_ips = stats.get('unscanned_or_error_ips', [])
-    print(f"  IPs without scan data (down/filtered/error): {len(unscanned_or_error_ips)}")
+    logging.info(f"  IPs without scan data (down/filtered/error): {len(unscanned_or_error_ips)}")
     if unscanned_or_error_ips: # Only print the list if it's not too long, or a sample
         if len(unscanned_or_error_ips) < 20 : # Arbitrary limit for direct printing
-             print(f"    Unscanned/Error IPs: {unscanned_or_error_ips}")
+             logging.info(f"    Unscanned/Error IPs: {unscanned_or_error_ips}")
         else:
-             print(f"    Unscanned/Error IPs: List too long to display here (see output files for details).")
-        # print("      (These IPs were targeted but no scan data was retrieved. They might have been down, filtered, or part of a failed scan chunk.)")
+             logging.info(f"    Unscanned/Error IPs: List too long to display here (see output files for details).")
+        # logging.info("      (These IPs were targeted but no scan data was retrieved. They might have been down, filtered, or part of a failed scan chunk.)")
 
     ips_in_failed_chunks = stats.get('ips_in_failed_chunks', [])
-    print(f"  IPs from chunks with execution errors:   {len(ips_in_failed_chunks)}")
+    logging.info(f"  IPs from chunks with execution errors:   {len(ips_in_failed_chunks)}")
     if ips_in_failed_chunks: # Only print if there are any
         if len(ips_in_failed_chunks) < 20:
-            print(f"    IPs in Failed Chunks: {ips_in_failed_chunks}")
+            logging.info(f"    IPs in Failed Chunks: {ips_in_failed_chunks}")
         else:
-            print(f"    IPs in Failed Chunks: List too long to display here (see output files for details).")
-        # print("      (The Nmap scan command itself failed for chunks containing these IPs.)")
-    print("---")
+            logging.info(f"    IPs in Failed Chunks: List too long to display here (see output files for details).")
+        # logging.info("      (The Nmap scan command itself failed for chunks containing these IPs.)")
+    logging.info("---")
 
     if not consolidated_data.get("hosts") and consolidated_data.get("errors"):
-        print("          Consolidation: No responsive hosts found, and errors were reported during some scan chunks.")
+        logging.warning("Consolidation: No responsive hosts found, and errors were reported during some scan chunks.")
     elif not consolidated_data.get("hosts"):
-        print("          Consolidation: No responsive hosts found, or no data retrieved from scans that identified live hosts/ports.")
+        logging.info("Consolidation: No responsive hosts found, or no data retrieved from scans that identified live hosts/ports.")
     else:
-        print(f"          Consolidation: Found data for {len(consolidated_data.get('hosts', {}))} unique host(s) with details.")
+        logging.info(f"Consolidation: Found data for {len(consolidated_data.get('hosts', {}))} unique host(s) with details.")
 
     # 5. Save results in specified formats
-    print(f"\nStep 5/5: Saving results to files with prefix '{args.output_prefix}'...")
+    logging.info(f"\nStep 5/5: Saving results to files with prefix '{args.output_prefix}'...")
     output_formats = [fmt.strip().lower() for fmt in args.formats.split(',') if fmt.strip()]
 
     output_handlers = {
@@ -207,22 +223,22 @@ def main():
             base_output_name = os.path.basename(args.output_prefix)
             output_filename = os.path.join(output_dir, f"{base_output_name}.{fmt}")
 
-            print(f"  Saving to {output_filename} (format: {fmt.upper()})...")
+            logging.info(f"  Saving to {output_filename} (format: {fmt.upper()})...")
             try:
                 output_handlers[fmt](consolidated_data, output_filename)
                 any_output_successful = True
             except Exception as e:
-                print(f"    Error saving to {fmt} format at {output_filename}: {e}")
+                logging.error(f"    Error saving to {fmt} format at {output_filename}: {e}")
         else:
-            print(f"  Warning: Unknown or unsupported format '{fmt}' specified. Skipping.")
+            logging.warning(f"  Unknown or unsupported format '{fmt}' specified. Skipping.")
 
-    print("-" * 40)
+    logging.info("-" * 40)
     if any_output_successful:
-        print("Nmap Parallel Scanner finished successfully. Output files are located with the prefix:")
-        print(f"  {os.path.abspath(args.output_prefix)}.<format>")
+        logging.info("Nmap Parallel Scanner finished successfully. Output files are located with the prefix:")
+        logging.info(f"  {os.path.abspath(args.output_prefix)}.<format>")
     else:
-        print("Nmap Parallel Scanner finished, but no output files were successfully generated.")
-        print("Please check logs for errors, especially if formats were specified but failed.")
+        logging.warning("Nmap Parallel Scanner finished, but no output files were successfully generated.")
+        logging.warning("Please check logs for errors, especially if formats were specified but failed.")
 
 
 if __name__ == "__main__":

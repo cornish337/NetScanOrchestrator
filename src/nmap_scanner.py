@@ -1,4 +1,5 @@
 import nmap
+import logging
 from typing import List, Dict, Any # Added typing
 
 def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]: # Ensure typing
@@ -21,7 +22,9 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
 
     try:
         # The scan method of python-nmap executes nmap and parses XML output.
+        logging.debug(f"Executing Nmap with targets: '{target_string}' and options: '{options}'")
         scan_output = nm.scan(hosts=target_string, arguments=options)
+        logging.debug(f"Nmap command executed: '{nm.command_line()}'")
 
         # Merge the raw scan_output into our result_dict.
         # scan_output structure is typically {'nmap': {...}, 'scan': {host1:..., host2:...}}
@@ -56,7 +59,7 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
         # This exception is raised if Nmap is not found or if there's an error running the command
         # (e.g., malformed arguments that nmap itself rejects).
         error_msg = f"Nmap scan error for targets '{target_string}': {str(e)}"
-        print(error_msg) # Consider using logging module for real applications
+        logging.error(error_msg)
         result_dict["error"] = "Nmap execution failed."
         # Provide a more specific detail if Nmap is not found.
         if "nmap program was not found" in str(e).lower():
@@ -77,7 +80,7 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
     except Exception as e:
         # Catch any other unexpected errors during the scan process.
         error_msg = f"An unexpected error occurred during Nmap scan for targets '{target_string}': {str(e)}"
-        print(error_msg) # Consider logging
+        logging.error(error_msg)
         result_dict["error"] = "Unexpected error during scan."
         result_dict["details"] = str(e)
         if nm.scanstats(): # Try to get stats
