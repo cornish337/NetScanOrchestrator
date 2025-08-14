@@ -4,6 +4,7 @@ import os
 import tempfile
 import json
 import sys
+import shutil
 
 class TestCLIIntegration(unittest.TestCase):
 
@@ -34,7 +35,10 @@ class TestCLIIntegration(unittest.TestCase):
     def tearDown(self):
         self.temp_output_dir_obj.cleanup()
 
-    @unittest.skipIf(os.getenv('GITHUB_ACTIONS') == 'true', "Skipping live Nmap scan in GitHub Actions to avoid network issues/blocks.")
+    @unittest.skipIf(
+        os.getenv('GITHUB_ACTIONS') == 'true' or shutil.which('nmap') is None,
+        "Skipping live Nmap scan in CI or when Nmap is unavailable."
+    )
     def test_scanner_runs_and_produces_valid_json_output(self):
         """
         Tests if the CLI scanner runs, produces a JSON output for scanme.nmap.org,
@@ -144,4 +148,3 @@ class TestCLIIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-```
