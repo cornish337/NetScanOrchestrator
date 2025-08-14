@@ -85,6 +85,14 @@ class Batch(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    parent_batch_id = Column(Integer, ForeignKey("batches.id"), nullable=True)
+    strategy = Column(String, nullable=True)
+
+    # Self-referential relationships to support recursive splitting
+    parent = relationship("Batch", remote_side=[id], back_populates="children")
+    children = relationship(
+        "Batch", back_populates="parent", cascade="all, delete-orphan"
+    )
 
     targets = relationship(
         "Target",
@@ -93,7 +101,10 @@ class Batch(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<Batch id={self.id} name={self.name}>"
+        return (
+            f"<Batch id={self.id} name={self.name} parent={self.parent_batch_id}"
+            f" strategy={self.strategy}>"
+        )
 
 
 class Job(Base):
