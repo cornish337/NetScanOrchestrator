@@ -7,9 +7,11 @@ import sqlite3
 
 
 class TestTyperCLI(unittest.TestCase):
+    """Exercise the Typer CLI using a temporary SQLite database."""
+
     def setUp(self):
-        self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-        self.input_file = os.path.join(self.project_root, "tests", "test_data", "integration_test_ips.txt")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        self.input_file = os.path.join(project_root, "tests", "test_data", "integration_test_ips.txt")
         tmp = tempfile.NamedTemporaryFile(delete=False)
         tmp.close()
         self.db_path = tmp.name
@@ -31,29 +33,31 @@ class TestTyperCLI(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=f"Command {' '.join(cmd)} failed with {result.stderr}")
         return result.stdout.strip()
 
-    def test_full_flow_creates_records(self):
+    def test_full_flow_status_counts(self):
+        """End-to-end ingest → plan → run → status"""
         # ingest
         self.run_cli("ingest", self.input_file)
         # plan
-        output = self.run_cli("plan")
-        run_id = int(output.split()[-1])
-        # split into batches of size 1
-        self.run_cli("split", run_id, "--chunk-size", "1")
-        # run all batches
+        plan_out = self.run_cli("plan")
+        run_id = int(plan_out.split()[-1])
+        # run
         self.run_cli("run", run_id)
+        # status
+        status_out = self.run_cli("status", run_id)
+        self.assertIn("completed: 1", status_out)
 
+        # verify records exist in database
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM targets")
         self.assertEqual(cur.fetchone()[0], 1)
         cur.execute("SELECT COUNT(*) FROM scan_runs")
         self.assertEqual(cur.fetchone()[0], 1)
-        cur.execute("SELECT COUNT(*) FROM batches")
-        self.assertEqual(cur.fetchone()[0], 1)
         cur.execute("SELECT COUNT(*) FROM jobs")
         self.assertEqual(cur.fetchone()[0], 1)
         conn.close()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+

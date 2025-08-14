@@ -1,10 +1,13 @@
 from pathlib import Path
-import typer
+from collections import Counter
+from datetime import datetime
 
+import typer
 from sqlalchemy.orm import Session
 
 from ..db.session import init_engine, get_session
 from ..db import repository as db_repo
+from ..db.models import Job
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -36,52 +39,53 @@ def ingest(ctx: typer.Context, input_file: Path):
 
 @app.command()
 def plan(ctx: typer.Context):
-    """Create a ScanRun covering all ingested targets."""
+    """Create a ScanRun and queue jobs for all targets."""
     session: Session = ctx.obj
+    targets = db_repo.list_targets(session)
+    if not targets:
+        typer.echo("No targets to plan")
+        raise typer.Exit(code=1)
     run = db_repo.create_scan_run(session, status="planned")
+    for target in targets:
+        db_repo.create_job(
+            session, scan_run_id=run.id, target_id=target.id, status="queued"
+        )
     typer.echo(f"Created scan run {run.id}")
 
 
 @app.command()
-def split(
-    ctx: typer.Context,
-    scan_run_id: int,
-    chunk_size: int = typer.Option(10, help="Targets per batch"),
-):
-    """Split all Targets into Batches for a ScanRun."""
+def run(ctx: typer.Context, scan_run_id: int):
+    """Execute all queued Jobs for a ScanRun."""
     session: Session = ctx.obj
-    targets = db_repo.list_targets(session)
-    if not targets:
-        typer.echo("No targets to batch")
+    jobs = (
+        session.query(Job)
+        .filter(Job.scan_run_id == scan_run_id, Job.status == "queued")
+        .all()
+    )
+    if not jobs:
+        typer.echo("No jobs to run")
         raise typer.Exit(code=1)
-    batches = []
-    for i in range(0, len(targets), chunk_size):
-        batch_targets = targets[i : i + chunk_size]
-        batch = db_repo.create_batch(
-            session,
-            name=f"run{scan_run_id}_batch{i // chunk_size + 1}",
-            targets=batch_targets,
-        )
-        batches.append(batch)
-    typer.echo(f"Created {len(batches)} batches")
+    now = datetime.utcnow()
+    for job in jobs:
+        job.status = "completed"
+        job.started_at = now
+        job.completed_at = now
+    db_repo.update_scan_run(session, scan_run_id, status="completed")
+    session.commit()
+    typer.echo(f"Executed {len(jobs)} jobs")
 
 
 @app.command()
-def run(ctx: typer.Context, scan_run_id: int):
-    """Execute all Batches for a ScanRun, creating Job records."""
+def status(ctx: typer.Context, scan_run_id: int):
+    """Show the status counts for Jobs in a ScanRun."""
     session: Session = ctx.obj
-    batches = db_repo.list_batches(session)
-    if not batches:
-        typer.echo("No batches to run")
+    jobs = session.query(Job).filter(Job.scan_run_id == scan_run_id).all()
+    if not jobs:
+        typer.echo("No jobs for run")
         raise typer.Exit(code=1)
-    jobs_created = 0
-    for batch in batches:
-        for target in batch.targets:
-            db_repo.create_job(
-                session, scan_run_id=scan_run_id, target_id=target.id, status="completed"
-            )
-            jobs_created += 1
-    typer.echo(f"Executed {len(batches)} batches")
+    counts = Counter(job.status for job in jobs)
+    for status_name, count in counts.items():
+        typer.echo(f"{status_name}: {count}")
 
 
 if __name__ == "__main__":
