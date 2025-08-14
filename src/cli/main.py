@@ -47,6 +47,9 @@ def split(
     ctx: typer.Context,
     scan_run_id: int,
     chunk_size: int = typer.Option(10, help="Targets per batch"),
+    strategy: str = typer.Option(
+        "initial", help="Strategy label for created batches"
+    ),
 ):
     """Split all Targets into Batches for a ScanRun."""
     session: Session = ctx.obj
@@ -61,9 +64,43 @@ def split(
             session,
             name=f"run{scan_run_id}_batch{i // chunk_size + 1}",
             targets=batch_targets,
+            strategy=strategy,
         )
         batches.append(batch)
     typer.echo(f"Created {len(batches)} batches")
+
+
+@app.command()
+def resplit(
+    ctx: typer.Context,
+    parent_batch_id: int,
+    chunk_size: int = typer.Option(10, help="Targets per child batch"),
+    strategy: str = typer.Option(
+        "resplit", help="Strategy label for created child batches"
+    ),
+):
+    """Split an existing Batch into child Batches."""
+    session: Session = ctx.obj
+    parent = db_repo.get_batch(session, parent_batch_id)
+    if not parent:
+        typer.echo("Parent batch not found")
+        raise typer.Exit(code=1)
+    targets = list(parent.targets)
+    if not targets:
+        typer.echo("Parent batch has no targets")
+        raise typer.Exit(code=1)
+    batches = []
+    for i in range(0, len(targets), chunk_size):
+        batch_targets = targets[i : i + chunk_size]
+        batch = db_repo.create_batch(
+            session,
+            name=f"{parent.name}_child{i // chunk_size + 1}",
+            targets=batch_targets,
+            parent_batch_id=parent.id,
+            strategy=strategy,
+        )
+        batches.append(batch)
+    typer.echo(f"Created {len(batches)} child batches")
 
 
 @app.command()
