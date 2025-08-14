@@ -61,3 +61,5 @@ htmlcov/
 /tmp/
 /nmap_debug.log
 /nextgen/
+/data/sample_inputs/ips_real.txt
+/data/real_inputs/
