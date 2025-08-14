@@ -60,3 +60,4 @@ htmlcov/
 *.swn
 /tmp/
 /nmap_debug.log
+/nextgen/
