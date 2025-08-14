@@ -1,6 +1,7 @@
 """SQLAlchemy ORM models for the NetScanOrchestrator."""
 
 from datetime import datetime
+from enum import Enum as PyEnum
 from typing import Optional
 
 from sqlalchemy import (
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Table,
+    Enum,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -23,6 +25,16 @@ batch_target_association = Table(
     Column("batch_id", ForeignKey("batches.id"), primary_key=True),
     Column("target_id", ForeignKey("targets.id"), primary_key=True),
 )
+
+
+class JobStatus(str, PyEnum):
+    """Enumeration of possible job and scan run states."""
+
+    PENDING = "pending"
+    PLANNED = "planned"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class Target(Base):
@@ -55,13 +67,14 @@ class ScanRun(Base):
     id = Column(Integer, primary_key=True)
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
-    status = Column(String, default="pending", nullable=False)
+    status = Column(Enum(JobStatus), default=JobStatus.PENDING, nullable=False)
     options = Column(String, nullable=True)  # e.g. nmap command line options
+    notes = Column(Text, nullable=True)
 
     jobs = relationship("Job", back_populates="scan_run")
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<ScanRun id={self.id} status={self.status}>"
+        return f"<ScanRun id={self.id} status={self.status.value}>"
 
 
 class Batch(Base):
@@ -91,7 +104,7 @@ class Job(Base):
     id = Column(Integer, primary_key=True)
     scan_run_id = Column(Integer, ForeignKey("scan_runs.id"), nullable=False)
     target_id = Column(Integer, ForeignKey("targets.id"), nullable=False)
-    status = Column(String, default="pending", nullable=False)
+    status = Column(Enum(JobStatus), default=JobStatus.PENDING, nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
@@ -100,7 +113,7 @@ class Job(Base):
     results = relationship("Result", back_populates="job")
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<Job id={self.id} target_id={self.target_id} status={self.status}>"
+        return f"<Job id={self.id} target_id={self.target_id} status={self.status.value}>"
 
 
 class Result(Base):

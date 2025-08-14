@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..db.session import init_engine, get_session
 from ..db import repository as db_repo
+from ..db.models import JobStatus
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -35,10 +36,18 @@ def ingest(ctx: typer.Context, input_file: Path):
 
 
 @app.command()
-def plan(ctx: typer.Context):
+def plan(
+    ctx: typer.Context,
+    options: str = typer.Option(
+        None, "--options", help="Scan options (e.g. nmap flags)", show_default=False
+    ),
+    notes: str = typer.Option(None, "--notes", help="Optional notes for the scan run"),
+):
     """Create a ScanRun covering all ingested targets."""
     session: Session = ctx.obj
-    run = db_repo.create_scan_run(session, status="planned")
+    run = db_repo.create_scan_run(
+        session, status=JobStatus.PLANNED, options=options, notes=notes
+    )
     typer.echo(f"Created scan run {run.id}")
 
 
@@ -78,7 +87,10 @@ def run(ctx: typer.Context, scan_run_id: int):
     for batch in batches:
         for target in batch.targets:
             db_repo.create_job(
-                session, scan_run_id=scan_run_id, target_id=target.id, status="completed"
+                session,
+                scan_run_id=scan_run_id,
+                target_id=target.id,
+                status=JobStatus.COMPLETED,
             )
             jobs_created += 1
     typer.echo(f"Executed {len(batches)} batches")
