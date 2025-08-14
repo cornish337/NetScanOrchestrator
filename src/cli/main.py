@@ -6,7 +6,7 @@ import typer
 
 from sqlalchemy.orm import Session
 
-from ..db.session import init_engine, get_session
+from ..db.session import init_engine, get_session, DEFAULT_DB_PATH
 from ..db import repository as db_repo
 from ..ip_handler import expand_targets
 from ..runner import RunnerJob, run_jobs
@@ -18,14 +18,14 @@ app = typer.Typer(help="NetScan Orchestrator CLI")
 def main(
     ctx: typer.Context,
     db_path: Path = typer.Option(
-        None,
+        Path(DEFAULT_DB_PATH),
         "--db-path",
         help="Path to SQLite state database",
         dir_okay=False,
     ),
 ):
     """Initialise the database engine and attach a session to context."""
-    init_engine(str(db_path) if db_path else None)
+    init_engine(str(db_path))
     ctx.obj = get_session()
 
 
