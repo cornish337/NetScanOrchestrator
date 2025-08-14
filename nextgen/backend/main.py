@@ -279,6 +279,11 @@ class SplitBody(BaseModel):
     strategy: str = "binary"
     parts: Optional[int] = None
 
+
+class NmapRunRequest(BaseModel):
+    target: str
+    settings: Optional[Settings] = None
+
 @app.post("/chunks/{chunk_id}/split")
 async def split_chunk(chunk_id: str, body: SplitBody):
     c = STATE["chunks"].get(chunk_id)
@@ -338,6 +343,22 @@ async def metrics():
     running = len([c for c in STATE["chunks"].values() if c.status == ChunkStatus.RUNNING])
     queued = len([c for c in STATE["chunks"].values() if c.status == ChunkStatus.QUEUED])
     return {"running": running, "queued": queued, "chunks": len(STATE["chunks"])}
+
+
+@app.post("/nmap/run")
+async def run_nmap_command(req: NmapRunRequest):
+    """Execute a one-off nmap scan for the provided target."""
+    settings = STATE["settings"].copy()
+    if req.settings:
+        settings.update(req.settings.dict(exclude_unset=True))
+    cmd, rc, stdout, stderr = await RUNNER.run_command(req.target, settings)
+    if rc != 0 and not stdout:
+        raise HTTPException(500, f"nmap failed: {stderr.strip()}")
+    try:
+        result = parse_nmap_xml(stdout)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to parse nmap output: {e}")
+    return {"command": cmd, "returncode": rc, "result": result, "stderr": stderr}
 
 @app.get("/health")
 async def health():

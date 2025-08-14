@@ -85,6 +85,22 @@ class NmapRunner:
         cmd += [ip]
         return cmd
 
+    def build_cmd(self, ip: str, settings: Dict) -> List[str]:
+        """Public helper to build the nmap command for an IP."""
+        return self._build_cmd(ip, settings)
+
+    async def run_command(self, ip: str, settings: Dict) -> Tuple[List[str], int, str, str]:
+        """
+        Build and execute an nmap command immediately for the given IP.
+        Returns the command list, return code, stdout and stderr (decoded).
+        """
+        cmd = self._build_cmd(ip, settings)
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        return cmd, proc.returncode, stdout.decode(), stderr.decode()
+
     async def _scan_ip(self, chunk_id: str, ip: str, settings: Dict, abort_event: asyncio.Event) -> Tuple[str, bool, int]:
         started = time.time()
         cmd = self._build_cmd(ip, settings)
