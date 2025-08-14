@@ -58,3 +58,5 @@ htmlcov/
 *.swp
 *.swo
 *.swn
+/tmp/
+/nmap_debug.log
