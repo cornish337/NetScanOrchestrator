@@ -39,8 +39,8 @@ class TestTyperCLI(unittest.TestCase):
         run_id = int(output.split()[-1])
         # split into batches of size 1
         self.run_cli("split", run_id, "--chunk-size", "1")
-        # run all batches
-        self.run_cli("run", run_id)
+        # run all batches with custom scheduling options
+        self.run_cli("run", run_id, "--max-procs", "2", "--rate-limit", "10")
 
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()

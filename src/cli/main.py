@@ -67,21 +67,39 @@ def split(
 
 
 @app.command()
-def run(ctx: typer.Context, scan_run_id: int):
+def run(
+    ctx: typer.Context,
+    scan_run_id: int,
+    max_procs: int = typer.Option(
+        1,
+        "--max-procs",
+        min=1,
+        help="Maximum number of scan jobs to execute in parallel.",
+    ),
+    rate_limit: float = typer.Option(
+        0.0,
+        "--rate-limit",
+        help="Maximum jobs to start per second. Use 0 for unlimited.",
+    ),
+):
     """Execute all Batches for a ScanRun, creating Job records."""
     session: Session = ctx.obj
     batches = db_repo.list_batches(session)
     if not batches:
         typer.echo("No batches to run")
         raise typer.Exit(code=1)
-    jobs_created = 0
-    for batch in batches:
-        for target in batch.targets:
-            db_repo.create_job(
-                session, scan_run_id=scan_run_id, target_id=target.id, status="completed"
-            )
-            jobs_created += 1
-    typer.echo(f"Executed {len(batches)} batches")
+
+    from ..runner import run_batches
+
+    jobs_created = run_batches(
+        session,
+        scan_run_id,
+        batches,
+        max_procs=max_procs,
+        rate_limit=rate_limit,
+    )
+
+    typer.echo(f"Executed {len(batches)} batches, {jobs_created} jobs")
 
 
 if __name__ == "__main__":

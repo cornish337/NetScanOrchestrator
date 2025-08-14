@@ -214,6 +214,29 @@ python nmap_parallel_scanner.py [OPTIONS]
         --nmap-options "-sS -A -T3"
     ```
 
+### Orchestration CLI
+
+For database-backed experimentation the repository also provides a small
+Typer-based CLI:
+
+```bash
+python -m src.cli.main [OPTIONS] COMMAND [ARGS]
+```
+
+The ``run`` command executes all pending batches for a scan run.  It now
+exposes two options for basic scheduling:
+
+* ``--max-procs`` – maximum number of scan jobs to execute concurrently
+  (default: ``1``).
+* ``--rate-limit`` – jobs to start per second; ``0`` disables rate
+  limiting (default: ``0``).
+
+Example:
+
+```bash
+python -m src.cli.main run 1 --max-procs 4 --rate-limit 2
+```
+
 ### Web Interface (for viewing results)
 
 The web UI is a simple Flask application to view *previously generated JSON results*. It does not initiate scans.
