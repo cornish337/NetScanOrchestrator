@@ -34,11 +34,9 @@ class TestTyperCLI(unittest.TestCase):
     def test_full_flow_creates_records(self):
         # ingest
         self.run_cli("ingest", self.input_file)
-        # plan
-        output = self.run_cli("plan")
+        # plan including batch creation
+        output = self.run_cli("plan", "--chunk-size", "1")
         run_id = int(output.split()[-1])
-        # split into batches of size 1
-        self.run_cli("split", run_id, "--chunk-size", "1")
         # run all batches
         self.run_cli("run", run_id)
 
@@ -52,6 +50,29 @@ class TestTyperCLI(unittest.TestCase):
         self.assertEqual(cur.fetchone()[0], 1)
         cur.execute("SELECT COUNT(*) FROM jobs")
         self.assertEqual(cur.fetchone()[0], 1)
+        conn.close()
+
+    def test_resplit_creates_new_batches(self):
+        # create a temporary input file with two targets
+        with tempfile.NamedTemporaryFile("w", delete=False) as tmp_in:
+            tmp_in.write("1.1.1.1\n2.2.2.2\n")
+            tmp_input = tmp_in.name
+        self.run_cli("ingest", tmp_input)
+        os.unlink(tmp_input)
+        output = self.run_cli("plan", "--chunk-size", "2")
+        run_id = int(output.split()[-1])
+        self.run_cli("run", run_id)
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM jobs LIMIT 1")
+        job_id = cur.fetchone()[0]
+        conn.close()
+        self.run_cli("resplit", job_id)
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM batches")
+        # original batch plus two child batches
+        self.assertEqual(cur.fetchone()[0], 3)
         conn.close()
 
 

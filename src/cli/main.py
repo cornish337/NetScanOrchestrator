@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..db.session import init_engine, get_session
 from ..db import repository as db_repo
+from .. import planner
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -35,35 +36,24 @@ def ingest(ctx: typer.Context, input_file: Path):
 
 
 @app.command()
-def plan(ctx: typer.Context):
-    """Create a ScanRun covering all ingested targets."""
+def plan(
+    ctx: typer.Context,
+    chunk_size: int = typer.Option(10, help="Targets per batch"),
+    strategy: str = typer.Option("sequential", help="Batching strategy"),
+):
+    """Create a ScanRun and initial Batches."""
     session: Session = ctx.obj
     run = db_repo.create_scan_run(session, status="planned")
+    planner.create_initial_batches(session, chunk_size=chunk_size, strategy=strategy)
     typer.echo(f"Created scan run {run.id}")
 
 
 @app.command()
-def split(
-    ctx: typer.Context,
-    scan_run_id: int,
-    chunk_size: int = typer.Option(10, help="Targets per batch"),
-):
-    """Split all Targets into Batches for a ScanRun."""
+def resplit(ctx: typer.Context, job_id: int):
+    """Split a batch in two based on a job that exceeded timeout."""
     session: Session = ctx.obj
-    targets = db_repo.list_targets(session)
-    if not targets:
-        typer.echo("No targets to batch")
-        raise typer.Exit(code=1)
-    batches = []
-    for i in range(0, len(targets), chunk_size):
-        batch_targets = targets[i : i + chunk_size]
-        batch = db_repo.create_batch(
-            session,
-            name=f"run{scan_run_id}_batch{i // chunk_size + 1}",
-            targets=batch_targets,
-        )
-        batches.append(batch)
-    typer.echo(f"Created {len(batches)} batches")
+    new_batches = planner.resplit_job(session, job_id)
+    typer.echo(f"Created {len(new_batches)} new batches")
 
 
 @app.command()
@@ -78,7 +68,11 @@ def run(ctx: typer.Context, scan_run_id: int):
     for batch in batches:
         for target in batch.targets:
             db_repo.create_job(
-                session, scan_run_id=scan_run_id, target_id=target.id, status="completed"
+                session,
+                scan_run_id=scan_run_id,
+                batch_id=batch.id,
+                target_id=target.id,
+                status="completed",
             )
             jobs_created += 1
     typer.echo(f"Executed {len(batches)} batches")

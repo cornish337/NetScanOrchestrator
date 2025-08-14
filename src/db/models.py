@@ -72,12 +72,16 @@ class Batch(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    parent_batch_id = Column(Integer, ForeignKey("batches.id"), nullable=True)
+    strategy = Column(String, nullable=True)
 
     targets = relationship(
         "Target",
         secondary=batch_target_association,
         back_populates="batches",
     )
+    jobs = relationship("Job", back_populates="batch")
+    parent = relationship("Batch", remote_side=[id], backref="children")
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Batch id={self.id} name={self.name}>"
@@ -90,12 +94,14 @@ class Job(Base):
 
     id = Column(Integer, primary_key=True)
     scan_run_id = Column(Integer, ForeignKey("scan_runs.id"), nullable=False)
+    batch_id = Column(Integer, ForeignKey("batches.id"), nullable=False)
     target_id = Column(Integer, ForeignKey("targets.id"), nullable=False)
     status = Column(String, default="pending", nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     scan_run = relationship("ScanRun", back_populates="jobs")
+    batch = relationship("Batch", back_populates="jobs")
     target = relationship("Target", back_populates="jobs")
     results = relationship("Result", back_populates="job")
 
