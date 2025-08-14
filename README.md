@@ -29,8 +29,16 @@ The Nmap Parallel Scanner consists of several core components:
 - **Results Handler (`src/results_handler.py`):** Consolidates results from all scanned chunks and handles their conversion into various output formats.
 - **CLI (`nmap_parallel_scanner.py`):** The main entry point for users, built with `argparse`. It orchestrates the scanning process based on user inputs.
 - **Web UI (`web_ui/app.py`):** A Flask application for viewing previously generated JSON scan results. It does not initiate scans but provides a way to browse reports.
+- **Configuration (`src/config.py`):** Central location for default settings such as the path to the state database.
+- **Database Layer (`src/db/` and `src/db_repository.py`):** SQLAlchemy models and repository helpers for managing targets, runs and jobs.
+- **Asynchronous Runner (`src/runner.py`):** Executes scan jobs with concurrency limits and timeout handling.
+- **Reporting Utilities (`src/reporting.py`):** Generates summaries of runs and jobs and can export them to JSON or CSV.
+
+Further details on these modules can be found in [`docs/MODULES.md`](docs/MODULES.md).
 
 ## Setup Instructions
+
+For a concise walkthrough of installation and executing scans, refer to [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 
 ### Local Setup
 
