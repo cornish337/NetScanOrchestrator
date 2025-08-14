@@ -1,16 +1,25 @@
 from typing import List, Optional, Dict, Any
+import os
 import asyncio
 import time
 import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from nmap_runner import NmapRunner
 
-app = FastAPI(title="Nmap Parallel Scanner API", version="0.1.0")
+STATE_DIR = os.environ.get("STATE_DIR", "/app/data")
+
+app = FastAPI(title="Nmap Parallel Scanner API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,10 +46,14 @@ class Chunk(BaseModel):
     attempt: int = 0
 
 class Settings(BaseModel):
-    max_workers: int = 4
+    max_workers: int = 2
+    per_host_workers: int = 8
     host_timeout_sec: int = 60
-    chunk_timeout_sec: int = 600
-    profile: str = "balanced"
+    chunk_timeout_sec: int = 1800
+    profile: str = "balanced"      # fast|balanced|thorough
+    scan_type: str = "sT"          # sS requires NET_RAW; sT is safe
+    ports: str = "top-1000"        # "top-1000" or "1-1024,3389"
+    extra_args: str = ""           # optional raw args
 
 class Coverage(BaseModel):
     total: int
@@ -71,10 +84,7 @@ def new_chunk(targets: List[str], parent_id: Optional[str] = None, attempt: int 
     STATE["chunks"][cid] = c
     return c
 
-if not STATE["chunks"]:
-    for _ in range(3):
-        new_chunk([f"10.0.0.{i}" for i in range(1, 33)])
-
+# Event broker
 class EventBroker:
     def __init__(self):
         self.queues: List[asyncio.Queue] = []
@@ -104,56 +114,78 @@ broker = EventBroker()
 async def emit(event_type: str, **payload):
     await broker.publish({"type": event_type, "ts": time.time(), **payload})
 
-RUNNER_TASK: Optional[asyncio.Task] = None
+# Runner and scheduler
+RUNNER = NmapRunner(state_dir=STATE_DIR, event_cb=lambda t, p: emit(t, **p))
+CHUNK_TASKS: Dict[str, asyncio.Task] = {}
 RUNNER_STOP = asyncio.Event()
 
-async def runner_loop():
+async def run_chunk_task(c: Chunk):
+    # Execute per-host scanning, update progress, mark results
+    try:
+        await emit("chunk_started", chunk_id=c.id)
+        c.started_at = time.time()
+        c.status = ChunkStatus.RUNNING
+        result = await RUNNER.scan_chunk(c.id, c.targets, STATE["settings"])
+        # Mark host-level outcomes
+        for ip in c.targets:
+            if ip in result["failed"]:
+                STATE["failed"].add(ip)
+                STATE["pending"].discard(ip)
+            else:
+                STATE["scanned_ok"].add(ip)
+                STATE["pending"].discard(ip)
+        c.progress_completed = c.progress_total
+        c.status = ChunkStatus.COMPLETED
+        c.completed_at = time.time()
+        await emit("chunk_completed", chunk_id=c.id, duration_ms=int((c.completed_at - (c.started_at or c.created_at)) * 1000))
+    except asyncio.CancelledError:
+        # Task was cancelled (likely via kill)
+        c.status = ChunkStatus.KILLED_SLOW
+        c.completed_at = time.time()
+        await emit("chunk_killed", chunk_id=c.id, reason="cancelled", elapsed_ms=int((c.completed_at - (c.started_at or c.created_at)) * 1000))
+        raise
+    except Exception as ex:
+        c.status = ChunkStatus.FAILED
+        c.completed_at = time.time()
+        await emit("chunk_failed", chunk_id=c.id, error=str(ex))
+    finally:
+        CHUNK_TASKS.pop(c.id, None)
+
+async def scheduler_loop():
     while not RUNNER_STOP.is_set():
-        running = [c for c in STATE["chunks"].values() if c.status == ChunkStatus.RUNNING]
-        queued = [c for c in STATE["chunks"].values() if c.status == ChunkStatus.QUEUED]
-        cap = STATE["settings"]["max_workers"] - len(running)
-        for c in queued[:max(0, cap)]:
-            c.status = ChunkStatus.RUNNING
-            c.started_at = time.time()
-            await emit("chunk_started", chunk_id=c.id)
-
-        for c in [c for c in STATE["chunks"].values() if c.status == ChunkStatus.RUNNING]:
-            if c.progress_completed < c.progress_total:
-                step = min(5, c.progress_total - c.progress_completed)
-                c.progress_completed += step
-                c.last_heartbeat = time.time()
-                await emit(
-                    "chunk_progress",
-                    chunk_id=c.id,
-                    completed_hosts=c.progress_completed,
-                    total_hosts=c.progress_total,
-                    elapsed_ms=int((time.time() - (c.started_at or c.created_at)) * 1000),
-                    last_heartbeat_ms=0,
-                )
-            if c.progress_completed >= c.progress_total:
-                c.status = ChunkStatus.COMPLETED
-                c.completed_at = time.time()
-                for ip in c.targets:
-                    STATE["scanned_ok"].add(ip)
-                    STATE["pending"].discard(ip)
-                await emit("chunk_completed", chunk_id=c.id, duration_ms=int((c.completed_at - (c.started_at or c.created_at)) * 1000))
-
-        await asyncio.sleep(1.0)
+        settings = STATE["settings"]
+        # Start queued up to max_workers
+        running = [cid for cid, t in CHUNK_TASKS.items() if not t.done()]
+        cap = settings["max_workers"] - len(running)
+        if cap > 0:
+            for c in [c for c in STATE["chunks"].values() if c.status == ChunkStatus.QUEUED][:cap]:
+                # queue task
+                t = asyncio.create_task(run_chunk_task(c))
+                CHUNK_TASKS[c.id] = t
+        await asyncio.sleep(0.5)
 
 @app.on_event("startup")
 async def on_startup():
+    # Seed demo targets if empty
+    if not STATE["chunks"]:
+        for _ in range(2):
+            new_chunk([f"10.0.0.{i}" for i in range(1, 17)])
     for c in STATE["chunks"].values():
         for ip in c.targets:
             STATE["pending"].add(ip)
-    global RUNNER_TASK
-    RUNNER_TASK = asyncio.create_task(runner_loop())
+    app.state.scheduler = asyncio.create_task(scheduler_loop())
 
 @app.on_event("shutdown")
 async def on_shutdown():
     RUNNER_STOP.set()
-    if RUNNER_TASK:
-        await asyncio.wait([RUNNER_TASK], timeout=2)
+    # Abort all running chunks
+    for cid in list(CHUNK_TASKS.keys()):
+        await RUNNER.abort_chunk(cid)
+        CHUNK_TASKS[cid].cancel()
+    # Wait briefly
+    await asyncio.sleep(1.0)
 
+# REST API
 @app.post("/targets/import")
 async def import_targets(file: UploadFile = File(...), chunk_size: int = Form(256)):
     data = (await file.read()).decode("utf-8", errors="ignore").splitlines()
@@ -190,8 +222,11 @@ async def kill_chunk(chunk_id: str):
     c = STATE["chunks"].get(chunk_id)
     if not c:
         raise HTTPException(404, "Chunk not found")
-    if c.status not in [ChunkStatus.RUNNING, ChunkStatus.QUEUED]:
-        raise HTTPException(400, "Chunk not running/queued")
+    # Signal abort and cancel task if running
+    await RUNNER.abort_chunk(chunk_id)
+    t = CHUNK_TASKS.get(chunk_id)
+    if t and not t.done():
+        t.cancel()
     c.status = ChunkStatus.KILLED_SLOW
     c.completed_at = time.time()
     await emit("chunk_killed", chunk_id=c.id, reason="user", elapsed_ms=int((c.completed_at - (c.started_at or c.created_at)) * 1000))
@@ -200,7 +235,6 @@ async def kill_chunk(chunk_id: str):
 class SplitBody(BaseModel):
     strategy: str = "binary"
     parts: Optional[int] = None
-    ranges: Optional[List[List[int]]] = None
 
 @app.post("/chunks/{chunk_id}/split")
 async def split_chunk(chunk_id: str, body: SplitBody):
@@ -217,6 +251,11 @@ async def split_chunk(chunk_id: str, body: SplitBody):
             STATE["pending"].add(ip)
         kids.append(child.id)
         await emit("chunk_created", chunk_id=child.id, parent_id=c.id, total_hosts=child.progress_total, strategy=body.strategy)
+    # Mark parent as killed (stop if running)
+    await RUNNER.abort_chunk(chunk_id)
+    t = CHUNK_TASKS.get(chunk_id)
+    if t and not t.done():
+        t.cancel()
     c.status = ChunkStatus.KILLED_SLOW
     c.completed_at = time.time()
     await emit("chunk_split", chunk_id=c.id, children=kids, strategy=body.strategy)
@@ -256,6 +295,10 @@ async def metrics():
     running = len([c for c in STATE["chunks"].values() if c.status == ChunkStatus.RUNNING])
     queued = len([c for c in STATE["chunks"].values() if c.status == ChunkStatus.QUEUED])
     return {"running": running, "queued": queued, "chunks": len(STATE["chunks"])}
+
+@app.get("/health")
+async def health():
+    return {"ok": True, "nmap_path": "nmap", "state_dir": STATE_DIR}
 
 @app.websocket("/ws/events")
 async def ws_events(ws: WebSocket):
