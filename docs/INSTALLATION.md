@@ -1,34 +1,53 @@
-# Installation and Running Guide
+# Installation Guide
 
-Follow these steps to set up the NetScan Orchestrator and run basic scans.
+Follow these steps to set up the NetScan Orchestrator.
 
 ## Prerequisites
-- Python 3.8 or newer
-- Nmap (optional for real network scans but required for full functionality)
+
+- **Python 3.7+**: Ensure you have a compatible version of Python installed.
+- **Nmap**: The core scanning functionality relies on the Nmap command-line tool. You must install it on your system and ensure it is available in your system's PATH.
 
 ## Installation
+
+The recommended way to install NetScan Orchestrator is using `pip` within a Python virtual environment.
+
+1.  **Clone the repository:**
+    If you haven't already, clone the project repository to your local machine.
+
+2.  **Create and activate a virtual environment:**
+    From the project's root directory, run the following commands. Using a virtual environment is a best practice to avoid conflicts with other Python projects.
+
+    ```bash
+    # Create the virtual environment
+    python3 -m venv venv
+
+    # Activate the virtual environment
+    # On macOS and Linux:
+    source venv/bin/activate
+    # On Windows:
+    # venv\Scripts\activate
+    ```
+    You will know the environment is active when you see `(venv)` at the beginning of your command prompt.
+
+3.  **Install the package:**
+    With the virtual environment active, install the package using `pip`. This command will also install all the necessary dependencies from `requirements.txt`.
+
+    For regular use:
+    ```bash
+    pip install .
+    ```
+
+    For development (this allows you to edit the code and have the changes immediately reflected without reinstalling):
+    ```bash
+    pip install -e .
+    ```
+
+## Verifying the Installation
+
+Once the installation is complete, a new command-line tool called `netscan` will be available in your environment. You can verify that it's installed correctly by running:
+
 ```bash
-git clone https://github.com/yourusername/nmap-parallel-scanner.git
-cd nmap-parallel-scanner
-python -m venv venv
-source venv/bin/activate  # On Windows use venv\Scripts\activate
-pip install -r requirements.txt
+netscan --help
 ```
 
-## Running the Command Line Interface
-The Typer-based CLI coordinates ingesting targets, planning runs and executing batches.
-
-```bash
-python -m src.cli.main ingest data/sample_inputs/example_ips.txt
-python -m src.cli.main plan
-python -m src.cli.main split 1 --chunk-size 5
-python -m src.cli.main run 1
-python -m src.cli.main status
-```
-
-## Running the Web UI
-Generate JSON output with the CLI and then start the Flask application:
-```bash
-python web_ui/app.py
-```
-The interface lists available reports under `http://localhost:5000`.
+This should display the main help menu with a list of available commands, confirming that the installation was successful. You are now ready to use the NetScan Orchestrator. See the [Usage Guide](USAGE.md) for details on how to run scans.
