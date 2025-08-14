@@ -83,6 +83,7 @@ class Batch(Base):
     __tablename__ = "batches"
 
     id = Column(Integer, primary_key=True)
+    scan_run_id = Column(Integer, ForeignKey("scan_runs.id"), nullable=False)
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     parent_batch_id = Column(Integer, ForeignKey("batches.id"), nullable=True)

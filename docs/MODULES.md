@@ -1,19 +1,27 @@
 # Module Overview
 
-This project is organised into several modules that coordinate network scans and result processing. The following list highlights recently added components.
+The NetScan Orchestrator is organized into several Python packages and modules within the `src` directory. This document provides an overview of their roles.
 
-## Configuration (`src/config.py`)
-Defines constants used across the project, such as the default path for the SQLite state database.
+## `cli` (`src/cli/`)
+This package contains the main entry point for the command-line interface.
+- **`main.py`**: A [Typer](https://typer.tiangolo.com/) application that defines all the `netscan` commands (`ingest`, `plan`, `run`, etc.) and orchestrates the application workflow.
 
-## Database Repository (`src/db_repository.py`)
-Provides a lightweight layer for storing and retrieving host information in a SQLite database. It includes simple CRUD helpers and queries by status.
+## `db` (`src/db/`)
+This package manages all database interactions using [SQLAlchemy](https://www.sqlalchemy.org/).
+- **`models.py`**: Defines the SQLAlchemy ORM models (`Target`, `ScanRun`, `Batch`, `Job`, `Result`) that represent the database schema.
+- **`repository.py`**: Provides convenience functions for all Create, Read, Update, and Delete (CRUD) operations on the database models.
+- **`session.py`**: Manages the database connection and session lifecycle.
 
-## Asynchronous Runner (`src/runner.py`)
-Runs shell commands concurrently with configurable timeouts and concurrency limits. Jobs are described using the `RunnerJob` dataclass and executed via `run_jobs`.
+## Core Logic Modules (`src/`)
 
-## Reporting Utilities (`src/reporting.py`)
-Summarises scan data stored in the database and exports reports. Helpers return slowest or failed jobs and can write summaries to JSON or CSV.
+- **`ip_handler.py`**: Contains utilities for parsing and expanding target IP addresses and ranges from input files.
+- **`nmap_scanner.py`**: A wrapper around the `python-nmap` library that executes Nmap scans for a given set of targets.
+- **`runner.py`**: An asynchronous runner that executes scan jobs with concurrency limits and timeout handling. It uses `asyncio` to manage parallel processes.
+- **`reporting.py`**: Provides functions to query the database and generate summary data, such as the slowest jobs or failed jobs. This module powers the `netscan status` command.
+- **`results_handler.py`**: This module is currently **unused** in the main CLI workflow but contains functions for consolidating and formatting scan results into various file types (JSON, CSV, etc.). Its functionality has been largely superseded by the database-driven approach.
 
-## Database Package (`src/db/`)
-Contains SQLAlchemy models and helpers for a richer persistence layer. It defines objects for scan runs, targets, batches, jobs and results along with session management utilities.
-
+## `web_ui` (`web_ui/`)
+This directory contains a simple Flask-based web application.
+- **`app.py`**: The main Flask application file.
+- **`templates/`**: Contains the HTML templates for the web interface.
+**Note:** The web UI is not fully integrated with the new database-driven workflow and may not be fully functional. See the project `README.md` for more details on its status.

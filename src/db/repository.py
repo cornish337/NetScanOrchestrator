@@ -6,7 +6,7 @@ from typing import Iterable, List, Optional, Type, TypeVar, Any
 
 from sqlalchemy.orm import Session
 
-from .models import Target, ScanRun, Batch, Job, Result
+from db.models import Target, ScanRun, Batch, Job, Result
 
 ModelType = TypeVar("ModelType", Target, ScanRun, Batch, Job, Result)
 
@@ -102,6 +102,11 @@ def get_batch(session: Session, batch_id: int) -> Optional[Batch]:
 
 def list_batches(session: Session) -> List[Batch]:
     return _list(session, Batch)
+
+
+def list_batches_for_run(session: Session, scan_run_id: int) -> List[Batch]:
+    """Return all Batches for a given ScanRun."""
+    return session.query(Batch).filter(Batch.scan_run_id == scan_run_id).all()
 
 
 def update_batch(session: Session, batch_id: int, **kwargs: Any) -> Optional[Batch]:

@@ -42,7 +42,7 @@ class TestReportingModule(unittest.TestCase):
             started_at=start,
             completed_at=start + timedelta(seconds=10),
         )
-        db_repo.create_result(self.session, job_id=j2.id, error="timeout")
+        db_repo.create_result(self.session, job_id=j2.id, stderr="timeout")
 
         runs = reporting.summarise_runs(self.session)
         self.assertEqual(runs[0]["failed_jobs"], 1)
