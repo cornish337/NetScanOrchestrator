@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 from typing import Optional
 from datetime import datetime
 import asyncio
@@ -127,6 +128,7 @@ def resplit(
 
 @app.command()
 def run(ctx: typer.Context, scan_run_id: int):
+
 """
 def run(
     ctx: typer.Context,
@@ -137,6 +139,7 @@ def run(
 """
     """Execute all Batches for a ScanRun, creating Job records."""
 
+
     session: Session = ctx.obj
     batches = db_repo.list_batches(session)
     if not batches:
@@ -146,17 +149,45 @@ def run(
     runner_jobs = []
     for batch in batches:
         for target in batch.targets:
+
             db_repo.create_job(
                 session,
                 scan_run_id=scan_run_id,
                 target_id=target.id,
                 status=JobStatus.COMPLETED,
 """            job = db_repo.create_job(
+
                 session,
                 scan_run_id=scan_run_id,
                 target_id=target.id,
                 status="running",
                 started_at=datetime.utcnow(),
+
+            )
+            stdout = stderr = summary_json = None
+            try:
+                from ..nmap_scanner import run_nmap_scan
+
+                scan_result = run_nmap_scan([target.address])
+                stdout = scan_result.get("nmap_output")
+                stderr = scan_result.get("details") or scan_result.get("error")
+                summary_json = json.dumps(scan_result)
+            except Exception as e:  # pragma: no cover
+                stderr = str(e)
+                summary_json = json.dumps({"error": str(e)})
+            db_repo.create_result(
+                session,
+                job_id=job.id,
+                stdout=stdout,
+                stderr=stderr,
+                summary_json=summary_json,
+            )
+            db_repo.update_job(
+                session,
+                job.id,
+                status="completed",
+                completed_at=datetime.utcnow(),
+
 """
             )
             runner_jobs.append(RunnerJob(job_id=job.id, address=target.address))
@@ -187,6 +218,7 @@ def run(
                 session,
                 name=f"retry_{target.id}_{int(datetime.utcnow().timestamp())}",
                 targets=[target],
+
             )
 
     typer.echo(f"Executed {len(batches)} batches")
