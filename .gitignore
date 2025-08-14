@@ -58,3 +58,7 @@ htmlcov/
 *.swp
 *.swo
 *.swn
+/tmp/
+data/real_inputs/ips_real.txt
+/data/project_files
+nmap_debug.log
