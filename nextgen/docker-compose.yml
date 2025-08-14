@@ -6,7 +6,7 @@ volumes:
 services:
   api:
     build:
-      context: ./backend
+      context: nextgen/backend
       target: dev
     environment:
       - STATE_DIR=/app/data
@@ -23,7 +23,7 @@ services:
 
   web:
     build:
-      context: ./frontend
+      context: nextgen/frontend
       target: dev
     environment:
       - PUBLIC_API_BASE=http://api:8000
@@ -31,14 +31,14 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - api
     profiles: ["dev"]
 
   api-prod:
     build:
-      context: ./backend
+      context: nextgen/backend
       target: prod
     environment:
       - STATE_DIR=/app/data
@@ -53,7 +53,7 @@ services:
 
   web-prod:
     build:
-      context: ./frontend
+      context: nextgen/frontend
       target: prod
       args:
         PUBLIC_API_BASE: http://api-prod:8000

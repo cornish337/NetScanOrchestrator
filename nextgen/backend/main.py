@@ -3,12 +3,15 @@ import os
 import asyncio
 import time
 import uuid
+import json # Add json import
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from nmap_runner import NmapRunner
+from xml_parser import parse_nmap_xml
 
 STATE_DIR = os.environ.get("STATE_DIR", "/app/data")
+SCANS_DIR = os.path.join(STATE_DIR, "scans")
 
 app = FastAPI(title="Nmap Parallel Scanner API", version="0.2.0")
 
@@ -217,6 +220,46 @@ async def get_chunk(chunk_id: str):
         raise HTTPException(404, "Chunk not found")
     return c
 
+@app.get("/chunks/{chunk_id}/details")
+async def get_chunk_details(chunk_id: str):
+    chunk = STATE["chunks"].get(chunk_id)
+    if not chunk:
+        raise HTTPException(404, "Chunk not found")
+
+    hosts = []
+    scan_dir = os.path.join(SCANS_DIR, chunk_id)
+    for ip in chunk.targets:
+        result_path = os.path.join(scan_dir, f"{ip}.xml")
+        hosts.append({
+            "ip": ip,
+            "has_result": os.path.exists(result_path) and os.path.getsize(result_path) > 0
+        })
+    return {"id": chunk_id, "targets": hosts}
+
+
+@app.get("/results/{chunk_id}/{ip}")
+async def get_scan_result(chunk_id: str, ip: str):
+    chunk = STATE["chunks"].get(chunk_id)
+    if not chunk:
+        raise HTTPException(404, "Chunk not found")
+    if ip not in chunk.targets:
+        raise HTTPException(400, "IP not in this chunk")
+
+    result_path = os.path.join(SCANS_DIR, chunk_id, f"{ip}.xml")
+    if not os.path.exists(result_path):
+        raise HTTPException(404, "Scan result not found for this IP.")
+
+    try:
+        with open(result_path, "r", encoding="utf-8") as f:
+            xml_content = f.read()
+
+        if not xml_content.strip():
+             return {"status": {"state": "down", "reason": "no-response"}}
+
+        return parse_nmap_xml(xml_content)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to read or parse scan result: {e}")
+
 @app.post("/chunks/{chunk_id}/kill")
 async def kill_chunk(chunk_id: str):
     c = STATE["chunks"].get(chunk_id)
@@ -299,6 +342,60 @@ async def metrics():
 @app.get("/health")
 async def health():
     return {"ok": True, "nmap_path": "nmap", "state_dir": STATE_DIR}
+
+@app.get("/export")
+async def export_results(format: str = "json"):
+    if format.lower() != "json":
+        raise HTTPException(400, "Unsupported format. Only JSON is currently supported.")
+
+    consolidated_report = {
+        "scan_started": None, # Placeholder
+        "scan_finished": None, # Placeholder
+        "hosts": {}
+    }
+
+    if not os.path.exists(SCANS_DIR):
+        return consolidated_report
+
+    all_files = []
+    for chunk_id in os.listdir(SCANS_DIR):
+        chunk_dir = os.path.join(SCANS_DIR, chunk_id)
+        if os.path.isdir(chunk_dir):
+            for filename in os.listdir(chunk_dir):
+                if filename.endswith(".xml"):
+                    all_files.append(os.path.join(chunk_dir, filename))
+
+    if not all_files:
+        return consolidated_report
+
+    # Find earliest and latest scan times from chunk data for placeholders
+    if STATE["chunks"]:
+        start_times = [c.created_at for c in STATE["chunks"].values() if c.created_at]
+        end_times = [c.completed_at for c in STATE["chunks"].values() if c.completed_at]
+        if start_times:
+            consolidated_report["scan_started"] = min(start_times)
+        if end_times:
+            consolidated_report["scan_finished"] = max(end_times)
+
+
+    for filepath in all_files:
+        try:
+            ip = os.path.basename(filepath).replace(".xml", "")
+            with open(filepath, "r", encoding="utf-8") as f:
+                xml_content = f.read()
+
+            if not xml_content.strip():
+                scan_data = {"status": {"state": "down", "reason": "no-response"}}
+            else:
+                scan_data = parse_nmap_xml(xml_content)
+
+            if "error" not in scan_data:
+                consolidated_report["hosts"][ip] = scan_data
+        except Exception:
+            # Ignore files that fail to parse, could log this
+            pass
+
+    return consolidated_report
 
 @app.websocket("/ws/events")
 async def ws_events(ws: WebSocket):

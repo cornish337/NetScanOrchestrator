@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getCoverage, getChunks, killChunk, splitChunk, requeueChunk, updateSettings } from '$lib/api';
+  import { getCoverage, getChunks, killChunk, splitChunk, requeueChunk, updateSettings, importTargets, exportResults } from '$lib/api';
   import { events } from '$lib/stores/events';
 
   let coverage: any = { total: 0, completed: 0, failed: 0, pending: 0, killed: 0 };
@@ -9,11 +9,56 @@
   let maxWorkers = 4;
   let parts = 2;
   let loading = false;
+  let exportLoading = false;
   let perHostWorkers = 8;
   let scanType = 'sT'; // sS if container has NET_RAW
   let ports = 'top-1000';
   let extraArgs = '';
   let error = '';
+
+  // For new scan
+  let targetsFile: FileList | null = null;
+  let targetsText = '';
+  let importError = '';
+  let importLoading = false;
+
+  async function handleExport() {
+    exportLoading = true;
+    try {
+      await exportResults('json');
+    } catch (e: any) {
+      error = e.message || 'Failed to export results';
+    } finally {
+      exportLoading = false;
+    }
+  }
+
+  async function handleImport() {
+    importError = '';
+    importLoading = true;
+    let fileToUpload: File;
+
+    if (targetsFile && targetsFile.length > 0) {
+      fileToUpload = targetsFile[0];
+    } else if (targetsText.trim()) {
+      fileToUpload = new File([targetsText.trim()], "targets.txt", { type: "text/plain" });
+    } else {
+      importError = 'Please provide a file or paste targets.';
+      importLoading = false;
+      return;
+    }
+
+    try {
+      await importTargets(fileToUpload);
+      targetsFile = null;
+      targetsText = '';
+      // A refresh will be triggered by the chunk_created event via websocket
+    } catch (e: any) {
+      importError = e?.message || 'Failed to import targets';
+    } finally {
+      importLoading = false;
+    }
+  }
 
   async function refresh() {
     loading = true;
@@ -88,6 +133,9 @@
       <input class="ml-2 border rounded p-1 w-20" type="number" min="2" bind:value={parts} />
     </label>
     <button class="px-3 py-1 border rounded" on:click={refresh} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</button>
+    <button class="px-3 py-1 border rounded bg-purple-600 text-white" on:click={handleExport} disabled={exportLoading}>
+      {exportLoading ? 'Exporting...' : 'Download Report (JSON)'}
+    </button>
   </div>
   <div class="flex flex-wrap items-end gap-3">
     <!-- existing controls -->
@@ -110,6 +158,26 @@
   </div>
 </section>
 
+<section class="mt-4 space-y-3 p-4 border rounded bg-gray-50">
+  <h2 class="text-base font-semibold">Start New Scan</h2>
+  {#if importError}<div class="text-red-600">{importError}</div>{/if}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label for="targets-file" class="block text-sm font-medium text-gray-700">Upload Targets File</label>
+      <input id="targets-file" type="file" class="mt-1 block w-full text-sm" bind:files={targetsFile} accept=".txt,text/plain">
+    </div>
+    <div>
+      <label for="targets-text" class="block text-sm font-medium text-gray-700">Or Paste Targets</label>
+      <textarea id="targets-text" class="mt-1 block w-full border rounded-md p-2 h-24" placeholder="8.8.8.8&#10;scanme.nmap.org" bind:value={targetsText}></textarea>
+    </div>
+  </div>
+  <div class="flex justify-end">
+    <button class="px-4 py-2 border rounded bg-green-600 text-white" on:click={handleImport} disabled={importLoading}>
+      {importLoading ? 'Importing...' : 'Import Targets & Start Scan'}
+    </button>
+  </div>
+</section>
+
 <section class="mt-4">
   <h2 class="text-base font-semibold mb-2">Chunks</h2>
   <div class="overflow-auto border rounded">
@@ -125,8 +193,12 @@
       </thead>
       <tbody>
         {#each chunks as c}
-          <tr class="border-t">
-            <td class="p-2 max-w-[28rem] truncate">{c.id}</td>
+          <tr class="border-t hover:bg-gray-50">
+            <td class="p-2 max-w-[28rem] truncate">
+              <a href="/chunk/{c.id}" class="text-blue-600 hover:underline" title="View chunk details">
+                {c.id}
+              </a>
+            </td>
             <td class="p-2">{c.status}</td>
             <td class="p-2">{c.progress_completed}/{c.progress_total}</td>
             <td class="p-2">
@@ -136,12 +208,13 @@
             </td>
             <td class="p-2 space-x-2">
               {#if c.status === 'running' || c.status === 'queued'}
-                <button class="px-2 py-1 border rounded bg-red-600 text-white" on:click={() => doKill(c.id)}>Kill</button>
-                <button class="px-2 py-1 border rounded bg-amber-600 text-white" on:click={() => doSplit(c.id)}>Split</button>
+                <button class="px-2 py-1 border rounded bg-red-600 text-white" on:click|stopPropagation={() => doKill(c.id)}>Kill</button>
+                <button class="px-2 py-1 border rounded bg-amber-600 text-white" on:click|stopPropagation={() => doSplit(c.id)}>Split</button>
               {/if}
               {#if c.status !== 'running'}
-                <button class="px-2 py-1 border rounded bg-gray-200" on:click={() => doRequeue(c.id)}>Requeue</button>
+                <button class="px-2 py-1 border rounded bg-gray-200" on:click|stopPropagation={() => doRequeue(c.id)}>Requeue</button>
               {/if}
+               <a href="/chunk/{c.id}" class="px-2 py-1 border rounded bg-gray-200" title="View Details">Details</a>
             </td>
           </tr>
         {/each}
