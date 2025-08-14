@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
+import enum
 
 from sqlalchemy import (
     Column,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Table,
+    Enum as SAEnum,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -83,6 +85,16 @@ class Batch(Base):
         return f"<Batch id={self.id} name={self.name}>"
 
 
+class JobStatus(enum.Enum):
+    """Possible execution states for a Job."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+
+
 class Job(Base):
     """Represents a unit of work scanning a single target within a scan run."""
 
@@ -91,13 +103,30 @@ class Job(Base):
     id = Column(Integer, primary_key=True)
     scan_run_id = Column(Integer, ForeignKey("scan_runs.id"), nullable=False)
     target_id = Column(Integer, ForeignKey("targets.id"), nullable=False)
-    status = Column(String, default="pending", nullable=False)
+    pid = Column(Integer, nullable=True)
+    command = Column(Text, default="", nullable=False)
+    return_code = Column(Integer, nullable=True)
+    timeout_sec = Column(Integer, nullable=True)
+    status = Column(
+        SAEnum(JobStatus, name="job_status"),
+        default=JobStatus.PENDING,
+        nullable=False,
+    )
+    error = Column(Text, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     scan_run = relationship("ScanRun", back_populates="jobs")
     target = relationship("Target", back_populates="jobs")
     results = relationship("Result", back_populates="job")
+
+    @property
+    def duration(self) -> Optional[float]:
+        """Return job runtime in seconds, if start and end times are known."""
+
+        if self.started_at and self.completed_at:
+            return (self.completed_at - self.started_at).total_seconds()
+        return None
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Job id={self.id} target_id={self.target_id} status={self.status}>"
