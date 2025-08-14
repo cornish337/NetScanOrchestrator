@@ -32,15 +32,15 @@ except ImportError:
         sys.exit(1)
 
 
-from src.ip_handler import read_ips_from_file, chunk_ips # Now should work with src prefix
+from src.ip_handler import read_ips_from_file, chunk_ips  # Now should work with src prefix
 from src.parallel_scanner import scan_chunks_parallel
-from results_handler import (
+from src.results_handler import (
     consolidate_scan_results,
     to_json,
     to_csv,
     to_txt,
     to_markdown,
-    to_xml
+    to_xml,
 )
 
 def main():
@@ -229,4 +229,3 @@ if __name__ == "__main__":
     # This allows the script to be run directly.
     # For a packaged application, entry points in setup.py would be used.
     main()
-```
