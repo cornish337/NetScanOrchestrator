@@ -9,6 +9,10 @@
   let maxWorkers = 4;
   let parts = 2;
   let loading = false;
+  let perHostWorkers = 8;
+  let scanType = 'sT'; // sS if container has NET_RAW
+  let ports = 'top-1000';
+  let extraArgs = '';
   let error = '';
 
   async function refresh() {
@@ -36,6 +40,16 @@
 
   async function setWorkers() {
     try { await updateSettings({ max_workers: maxWorkers }); } finally {}
+  }
+
+  async function applyScanSettings() {
+    await updateSettings({
+      max_workers: maxWorkers,
+      per_host_workers: perHostWorkers,
+      scan_type: scanType,
+      ports,
+      extra_args: extraArgs
+    });
   }
 
   async function doKill(id: string) { await killChunk(id); }
@@ -74,6 +88,25 @@
       <input class="ml-2 border rounded p-1 w-20" type="number" min="2" bind:value={parts} />
     </label>
     <button class="px-3 py-1 border rounded" on:click={refresh} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</button>
+  </div>
+  <div class="flex flex-wrap items-end gap-3">
+    <!-- existing controls -->
+    <label class="text-sm">Per-host workers
+      <input class="ml-2 border rounded p-1 w-20" type="number" min="1" bind:value={perHostWorkers} />
+    </label>
+    <label class="text-sm">Scan type
+      <select class="ml-2 border rounded p-1" bind:value={scanType}>
+        <option value="sT">-sT (TCP Connect)</option>
+        <option value="sS">-sS (SYN, needs NET_RAW)</option>
+      </select>
+    </label>
+    <label class="text-sm">Ports
+      <input class="ml-2 border rounded p-1 w-48" placeholder="top-1000 or 1-1024,3389" bind:value={ports} />
+    </label>
+    <label class="text-sm">Extra args
+      <input class="ml-2 border rounded p-1 w-64" placeholder="--min-rate 1000" bind:value={extraArgs} />
+    </label>
+    <button class="px-3 py-1 border rounded bg-indigo-600 text-white" on:click={applyScanSettings}>Apply scan settings</button>
   </div>
 </section>
 
