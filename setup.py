@@ -35,6 +35,7 @@ setuptools.setup(
     entry_points={
         'console_scripts': [
             'parallel-nmap-scanner=nmap_parallel_scanner:main', # Assuming your main CLI script is nmap_parallel_scanner.py and has a main()
+            'netscan=netscan.cli:main',
         ],
         'gui_scripts': [
             'parallel-nmap-scanner-ui=web_ui.app:main', # Or however the Flask app is meant to be launched if not just `flask run`
