@@ -28,6 +28,15 @@ This project contains a real-time "Nmap Parallel Scanner" control panel.
     ```
     The backend will be running at `http://localhost:8000`.
 
+    A one-off scan can be triggered via:
+
+    ```sh
+    curl -X POST http://localhost:8000/nmap/run \
+      -H 'Content-Type: application/json' \
+      -d '{"target": "scanme.nmap.org"}'
+    ```
+    The response includes the executed command and parsed scan results.
+
 ### Frontend
 
 1.  Navigate to the frontend directory:
