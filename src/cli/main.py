@@ -1,4 +1,7 @@
 from pathlib import Path
+from datetime import datetime
+import asyncio
+
 import typer
 
 from sqlalchemy.orm import Session
@@ -6,6 +9,8 @@ from sqlalchemy.orm import Session
 from ..db.session import init_engine, get_session
 from ..db import repository as db_repo
 from ..db.models import JobStatus
+from ..ip_handler import expand_targets
+from ..runner import RunnerJob, run_jobs
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -26,10 +31,17 @@ def main(
 
 
 @app.command()
-def ingest(ctx: typer.Context, input_file: Path):
+def ingest(
+    ctx: typer.Context,
+    input_file: Path,
+    max_expand: int = typer.Option(
+        4096, "--max-expand", help="Maximum addresses allowed when expanding ranges"
+    ),
+):
     """Ingest targets from a file and create Target records."""
     session: Session = ctx.obj
-    targets = [line.strip() for line in input_file.read_text().splitlines() if line.strip()]
+    with input_file.open("r", encoding="utf-8") as f:
+        targets = expand_targets(f, max_expand=max_expand)
     for address in targets:
         db_repo.create_target(session, address=address)
     typer.echo(f"Ingested {len(targets)} targets")
@@ -76,14 +88,21 @@ def split(
 
 
 @app.command()
-def run(ctx: typer.Context, scan_run_id: int):
+def run(
+    ctx: typer.Context,
+    scan_run_id: int,
+    timeout_sec: int = typer.Option(30, help="Timeout for each job"),
+    concurrency: int = typer.Option(4, help="Concurrent jobs"),
+):
     """Execute all Batches for a ScanRun, creating Job records."""
+
     session: Session = ctx.obj
     batches = db_repo.list_batches(session)
     if not batches:
         typer.echo("No batches to run")
         raise typer.Exit(code=1)
-    jobs_created = 0
+
+    runner_jobs = []
     for batch in batches:
         for target in batch.targets:
             db_repo.create_job(
@@ -91,8 +110,44 @@ def run(ctx: typer.Context, scan_run_id: int):
                 scan_run_id=scan_run_id,
                 target_id=target.id,
                 status=JobStatus.COMPLETED,
+"""            job = db_repo.create_job(
+                session,
+                scan_run_id=scan_run_id,
+                target_id=target.id,
+                status="running",
+                started_at=datetime.utcnow(),
+"""
             )
-            jobs_created += 1
+            runner_jobs.append(RunnerJob(job_id=job.id, address=target.address))
+
+    results = asyncio.run(run_jobs(runner_jobs, timeout_sec=timeout_sec, concurrency=concurrency))
+
+    timed_out_targets = []
+    for res in results:
+        db_repo.create_result(
+            session, job_id=res["job_id"], output=res.get("stdout"), error=res.get("stderr")
+        )
+        db_repo.update_job(
+            session,
+            res["job_id"],
+            status=res["status"],
+            completed_at=datetime.utcnow(),
+        )
+        if res["status"] == "timeout":
+            timed_out_targets.append(res["address"])
+
+    # Queue new batches for timed-out targets so planner can retry
+    for address in timed_out_targets:
+        target = next(
+            (t for t in db_repo.list_targets(session) if t.address == address), None
+        )
+        if target:
+            db_repo.create_batch(
+                session,
+                name=f"retry_{target.id}_{int(datetime.utcnow().timestamp())}",
+                targets=[target],
+            )
+
     typer.echo(f"Executed {len(batches)} batches")
 
 
