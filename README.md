@@ -184,6 +184,10 @@ python nmap_parallel_scanner.py [OPTIONS]
     -   Number of IPs per chunk for parallel scanning.
     -   Default: `10`.
 
+-   `--select-chunks` (optional)
+    -   After displaying the list of chunks, prompt to choose specific chunk numbers to scan.
+    -   Press Enter to scan all chunks.
+
 -   `--num-processes NUM_PROCESSES` (optional)
     -   Number of parallel Nmap processes.
     -   Default: Number of CPU cores on your system.
