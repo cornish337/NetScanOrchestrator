@@ -2,7 +2,7 @@ import nmap
 import logging
 from typing import List, Dict, Any # Added typing
 
-def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]: # Ensure typing
+def run_nmap_scan(targets: List[str], options: str = "-T4 -F", chunk_id: int | None = None) -> Dict[str, Any]:  # Ensure typing
     """
     Runs an Nmap scan on the given targets with the specified options.
     Includes input_targets in the returned dictionary.
@@ -10,6 +10,7 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
     Args:
         targets: A list of IP addresses or network ranges.
         options: Nmap command-line options.
+        chunk_id: Optional identifier for the chunk being scanned. Used for logging/debugging.
 
     Returns:
         A dictionary containing the parsed Nmap scan results (or error details)
@@ -24,11 +25,21 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
         # Construct the command string for logging, mimicking python-nmap's behavior.
         # python-nmap adds '-oX -' to parse the output.
         command = f"nmap -oX - {options} {target_string}"
-        logging.debug(f"Attempting to run Nmap command: {command}")
+        if chunk_id is not None:
+            logging.info(f"Chunk {chunk_id}: Running Nmap command: {command}")
+        else:
+            logging.info(f"Running Nmap command: {command}")
 
         # The scan method of python-nmap executes nmap and parses XML output.
         scan_output = nm.scan(hosts=target_string, arguments=options)
-        logging.debug(f"Nmap command finished successfully. Full command executed: '{nm.command_line()}'")
+        executed_cmd = nm.command_line()
+        logging.info(f"Chunk {chunk_id}: Command executed: '{executed_cmd}'" if chunk_id is not None else f"Command executed: '{executed_cmd}'")
+        raw_output = nm.get_nmap_last_output()
+        logging.info(
+            f"Chunk {chunk_id}: Nmap output:\n{raw_output}" if chunk_id is not None else f"Nmap output:\n{raw_output}"
+        )
+        result_dict["command_line"] = executed_cmd
+        result_dict["raw_output"] = raw_output
 
 
         # Merge the raw scan_output into our result_dict.
@@ -66,6 +77,7 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
         error_msg = f"Nmap scan error for targets '{target_string}': {str(e)}"
         logging.error(error_msg)
         result_dict["error"] = "Nmap execution failed."
+        result_dict["command_line"] = command
         # Provide a more specific detail if Nmap is not found.
         if "nmap program was not found" in str(e).lower():
             result_dict["details"] = "Nmap command not found. Please ensure Nmap is installed and in your system's PATH."
@@ -81,6 +93,10 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
         # Include scan stats if available even in error, though might be minimal
         if nm.scanstats():
              result_dict["stats"] = nm.scanstats()
+        # Capture any last output even on failure
+        raw_output = nm.get_nmap_last_output()
+        if raw_output:
+            result_dict["raw_output"] = raw_output
 
     except Exception as e:
         # Catch any other unexpected errors during the scan process.
@@ -88,7 +104,10 @@ def run_nmap_scan(targets: List[str], options: str = "-T4 -F") -> Dict[str, Any]
         logging.error(error_msg)
         result_dict["error"] = "Unexpected error during scan."
         result_dict["details"] = str(e)
-        if nm.scanstats(): # Try to get stats
+        if nm.scanstats():  # Try to get stats
              result_dict["stats"] = nm.scanstats()
+        raw_output = nm.get_nmap_last_output()
+        if raw_output:
+            result_dict["raw_output"] = raw_output
 
     return result_dict

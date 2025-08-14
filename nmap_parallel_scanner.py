@@ -144,16 +144,52 @@ def main():
 
     # 2. Chunk IPs
     logging.info(f"Step 2/5: Chunking IPs into groups of {args.chunk_size}...")
-    ip_chunks = chunk_ips(ips_to_scan, chunk_size=args.chunk_size, custom_ranges=None)
-    if not ip_chunks:
+    ip_chunks_raw = chunk_ips(ips_to_scan, chunk_size=args.chunk_size, custom_ranges=None)
+    if not ip_chunks_raw:
         logging.info("          No IP chunks to scan (input list might have been empty after processing). Exiting.")
         return
-    logging.info(f"          Created {len(ip_chunks)} chunk(s).")
+    logging.info(f"          Created {len(ip_chunks_raw)} chunk(s).")
 
-    # 3. Run scans in parallel
-    logging.info(f"Step 3/5: Starting Nmap scans for {len(ip_chunks)} chunk(s) using {args.num_processes} parallel process(es)...")
+    # Display chunk table
+    chunk_pairs = list(enumerate(ip_chunks_raw, 1))
+    logging.info("\nAvailable Chunks:")
+    for cid, chunk in chunk_pairs:
+        logging.info(f"  {cid:>3}: {', '.join(chunk)}")
+
+    # Allow user to select specific chunks if running interactively
+    selected_pairs = chunk_pairs
+    if sys.stdin.isatty():
+        selection = input("Enter chunk numbers to scan (comma-separated or ranges, press Enter for all): ").strip()
+        if selection and selection.lower() != 'all':
+            chosen_ids = set()
+            for part in selection.split(','):
+                part = part.strip()
+                if '-' in part:
+                    start, end = part.split('-', 1)
+                    try:
+                        start_i, end_i = int(start), int(end)
+                        chosen_ids.update(range(start_i, end_i + 1))
+                    except ValueError:
+                        pass
+                else:
+                    try:
+                        chosen_ids.add(int(part))
+                    except ValueError:
+                        pass
+            selected_pairs = [p for p in chunk_pairs if p[0] in chosen_ids]
+            logging.info(f"Selected chunks: {sorted(chosen_ids)}")
+        else:
+            logging.info("No specific chunks selected; scanning all.")
+    else:
+        logging.info("Standard input not interactive; scanning all chunks.")
+
+    if not selected_pairs:
+        logging.info("No chunks selected. Exiting without scanning.")
+        return
+
+    logging.info(f"Step 3/5: Starting Nmap scans for {len(selected_pairs)} chunk(s) using {args.num_processes} parallel process(es)...")
     logging.info(f"          Nmap options for scan: '{args.nmap_options}'")
-    raw_scan_results = scan_chunks_parallel(ip_chunks, args.nmap_options, args.num_processes)
+    raw_scan_results = scan_chunks_parallel(selected_pairs, args.nmap_options, args.num_processes)
 
     if not raw_scan_results:
         logging.warning("Parallel scanning returned no results. This might indicate an issue with the parallel processing setup or that all scan jobs failed very early. Exiting.")

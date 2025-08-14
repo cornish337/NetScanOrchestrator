@@ -1,15 +1,16 @@
 import multiprocessing
 from src.nmap_scanner import run_nmap_scan
-from typing import List, Dict
+from typing import List, Dict, Tuple, Any
 # We might need to wrap run_nmap_scan or pass arguments carefully for starmap
 # For now, let's assume we'll adapt the call within scan_chunks_parallel
 
-def scan_chunks_parallel(ip_chunks: List[List[str]], nmap_options: str, num_processes: int = None) -> List[Dict]:
+def scan_chunks_parallel(ip_chunks: List[Any], nmap_options: str, num_processes: int = None) -> List[Dict]:
     """
     Scans multiple chunks of IPs in parallel using Nmap.
 
     Args:
-        ip_chunks: A list of IP chunks (each chunk is a list of IP strings).
+        ip_chunks: A list of IP chunks. Each item can be either a list of IP strings
+                    or a tuple of (chunk_id, [IP strings]).
         nmap_options: Nmap command-line options string.
         num_processes: The number of parallel processes to use.
                        Defaults to the number of CPU cores if None.
@@ -30,9 +31,14 @@ def scan_chunks_parallel(ip_chunks: List[List[str]], nmap_options: str, num_proc
     if num_processes <= 0: # Should not happen with cpu_count() but as a safeguard
         num_processes = 1
 
+    # Normalize ip_chunks to a list of tuples (chunk_id, chunk_list)
+    if ip_chunks and isinstance(ip_chunks[0], tuple):
+        chunk_pairs: List[Tuple[int, List[str]]] = [(cid, chunk) for cid, chunk in ip_chunks]
+    else:
+        chunk_pairs = list(enumerate(ip_chunks, 1))
+
     # Create a list of arguments for each call to run_nmap_scan
-    # Each item in pool_args will be a tuple (chunk, nmap_options)
-    pool_args = [(chunk, nmap_options) for chunk in ip_chunks]
+    pool_args = [(chunk, nmap_options, cid) for cid, chunk in chunk_pairs]
 
     results = []
     # Using try-finally to ensure pool is closed
@@ -43,7 +49,7 @@ def scan_chunks_parallel(ip_chunks: List[List[str]], nmap_options: str, num_proc
         # pool = ctx.Pool(processes=num_processes)
         pool = multiprocessing.Pool(processes=num_processes)
         # Use starmap to pass multiple arguments to run_nmap_scan
-        # run_nmap_scan expects (targets: list[str], options: str)
+        # run_nmap_scan expects (targets: list[str], options: str, chunk_id: int)
         results = pool.starmap(run_nmap_scan, pool_args)
     except Exception as e:
         print(f"Error during parallel scanning: {e}")
