@@ -7,11 +7,11 @@ with open("requirements.txt", "r", encoding="utf-8") as f:
     requirements = f.read().splitlines()
 
 setuptools.setup(
-    name="parallel_nmap_scanner",
+    name="NetScanOrchestrator",
     version="0.1.0",
     author="AI Developer", # Or a more specific name/email
     author_email="ai.dev@example.com",
-    description="A parallel Nmap scanner with a web UI",
+    description="A parallel Nmap scanner with a web UI and database logging",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="<your-repository-url-here>", # Placeholder for actual repo URL
@@ -34,17 +34,8 @@ setuptools.setup(
     install_requires=requirements,
     entry_points={
         'console_scripts': [
-            'parallel-nmap-scanner=nmap_parallel_scanner:main', # Assuming your main CLI script is nmap_parallel_scanner.py and has a main()
-        ],
-        'gui_scripts': [
-            'parallel-nmap-scanner-ui=web_ui.app:main', # Or however the Flask app is meant to be launched if not just `flask run`
+            'netscan=cli.main:app',
         ],
     },
     include_package_data=True, # To include non-code files specified in MANIFEST.in (if you add one) or by SCM integration
-    # If you have data files within your packages (e.g. src/your_package/data_file.dat)
-    # package_data={
-    # 'your_package': ['data_file.dat'],
-    # },
-    # If you have data files outside your packages but you want to include them in the wheel/sdist
-    # data_files=[('my_data', ['data/data_file'])],
 )

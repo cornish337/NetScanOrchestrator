@@ -16,7 +16,7 @@ import json
 
 from sqlalchemy.orm import Session
 
-from .db.models import ScanRun, Batch, Job
+from db.models import ScanRun, Batch, Job
 
 
 # ---------------------------------------------------------------------------
@@ -67,8 +67,8 @@ def get_failed_jobs(session: Session) -> List[Dict[str, Any]]:
         # in Python to avoid complex SQL for this educational project.
         error: Optional[str] = None
         for res in job.results:
-            if res.error:
-                error = res.error
+            if res.stderr:
+                error = res.stderr
                 break
         if job.status != "completed" or error:
             failed.append(

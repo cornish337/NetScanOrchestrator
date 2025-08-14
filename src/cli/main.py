@@ -7,12 +7,12 @@ import typer
 
 from sqlalchemy.orm import Session
 
-from ..db.session import init_engine, get_session, DEFAULT_DB_PATH
-from ..db import repository as db_repo
-from ..db.models import JobStatus
-from .. import reporting
-from ..ip_handler import expand_targets
-from ..runner import RunnerJob, run_jobs
+from db.session import init_engine, get_session, DEFAULT_DB_PATH
+from db import repository as db_repo
+from db.models import JobStatus
+import reporting
+from ip_handler import expand_targets
+from runner import RunnerJob, run_jobs
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -85,6 +85,7 @@ def split(
         batch_targets = targets[i : i + chunk_size]
         batch = db_repo.create_batch(
             session,
+            scan_run_id=scan_run_id,
             name=f"run{scan_run_id}_batch{i // chunk_size + 1}",
             targets=batch_targets,
             strategy=strategy,
@@ -117,6 +118,7 @@ def resplit(
         batch_targets = targets[i : i + chunk_size]
         batch = db_repo.create_batch(
             session,
+            scan_run_id=parent.scan_run_id,
             name=f"{parent.name}_child{i // chunk_size + 1}",
             targets=batch_targets,
             parent_batch_id=parent.id,
@@ -127,77 +129,46 @@ def resplit(
 
 
 @app.command()
-def run(ctx: typer.Context, scan_run_id: int):
-
-"""
 def run(
     ctx: typer.Context,
     scan_run_id: int,
     timeout_sec: int = typer.Option(30, help="Timeout for each job"),
     concurrency: int = typer.Option(4, help="Concurrent jobs"),
 ):
-"""
     """Execute all Batches for a ScanRun, creating Job records."""
-
-
     session: Session = ctx.obj
-    batches = db_repo.list_batches(session)
+    run = db_repo.get_scan_run(session, scan_run_id)
+    if not run:
+        typer.echo(f"ScanRun {scan_run_id} not found")
+        raise typer.Exit(code=1)
+
+    batches = db_repo.list_batches_for_run(session, scan_run_id)
     if not batches:
-        typer.echo("No batches to run")
+        typer.echo("No batches to run for this scan run")
         raise typer.Exit(code=1)
 
     runner_jobs = []
     for batch in batches:
         for target in batch.targets:
-
-            db_repo.create_job(
+            job = db_repo.create_job(
                 session,
                 scan_run_id=scan_run_id,
                 target_id=target.id,
-                status=JobStatus.COMPLETED,
-"""            job = db_repo.create_job(
-
-                session,
-                scan_run_id=scan_run_id,
-                target_id=target.id,
-                status="running",
-                started_at=datetime.utcnow(),
-
-            )
-            stdout = stderr = summary_json = None
-            try:
-                from ..nmap_scanner import run_nmap_scan
-
-                scan_result = run_nmap_scan([target.address])
-                stdout = scan_result.get("nmap_output")
-                stderr = scan_result.get("details") or scan_result.get("error")
-                summary_json = json.dumps(scan_result)
-            except Exception as e:  # pragma: no cover
-                stderr = str(e)
-                summary_json = json.dumps({"error": str(e)})
-            db_repo.create_result(
-                session,
-                job_id=job.id,
-                stdout=stdout,
-                stderr=stderr,
-                summary_json=summary_json,
-            )
-            db_repo.update_job(
-                session,
-                job.id,
-                status="completed",
-                completed_at=datetime.utcnow(),
-
-"""
+                status=JobStatus.PLANNED,
             )
             runner_jobs.append(RunnerJob(job_id=job.id, address=target.address))
 
-    results = asyncio.run(run_jobs(runner_jobs, timeout_sec=timeout_sec, concurrency=concurrency))
+    results = asyncio.run(
+        run_jobs(runner_jobs, timeout_sec=timeout_sec, concurrency=concurrency)
+    )
 
     timed_out_targets = []
     for res in results:
         db_repo.create_result(
-            session, job_id=res["job_id"], output=res.get("stdout"), error=res.get("stderr")
+            session,
+            job_id=res["job_id"],
+            stdout=res.get("stdout"),
+            stderr=res.get("stderr"),
         )
         db_repo.update_job(
             session,
