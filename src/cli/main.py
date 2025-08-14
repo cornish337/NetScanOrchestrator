@@ -1,10 +1,13 @@
 from pathlib import Path
+from typing import Optional
+
 import typer
 
 from sqlalchemy.orm import Session
 
 from ..db.session import init_engine, get_session
 from ..db import repository as db_repo
+from .. import reporting
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -82,6 +85,66 @@ def run(ctx: typer.Context, scan_run_id: int):
             )
             jobs_created += 1
     typer.echo(f"Executed {len(batches)} batches")
+
+
+@app.command()
+def status(
+    ctx: typer.Context,
+    json_out: Optional[Path] = typer.Option(
+        None, "--json-out", help="Write summary information to JSON file", dir_okay=False
+    ),
+    csv_out: Optional[Path] = typer.Option(
+        None, "--csv-out", help="Write run summary to CSV file", dir_okay=False
+    ),
+):
+    """Display a summary of scan runs, jobs and failures."""
+
+    session: Session = ctx.obj
+
+    run_summary = reporting.summarise_runs(session)
+    slowest_jobs = reporting.get_slowest_jobs(session)
+    failed_jobs = reporting.get_failed_jobs(session)
+    export_payload = {
+        "runs": run_summary,
+        "slowest_jobs": slowest_jobs,
+        "failed_jobs": failed_jobs,
+    }
+
+    if json_out:
+        reporting.export_json(export_payload, str(json_out))
+    if csv_out:
+        reporting.export_csv(run_summary, str(csv_out))
+
+    typer.echo("ScanRun Summary")
+    if run_summary:
+        typer.echo(f"{'Run':<5} {'Total':<6} {'Completed':<9} {'Failed':<6}")
+        for row in run_summary:
+            typer.echo(
+                f"{row['scan_run_id']:<5} {row['total_jobs']:<6} {row['completed_jobs']:<9} {row['failed_jobs']:<6}"
+            )
+    else:
+        typer.echo("No ScanRuns found")
+
+    typer.echo("\nSlowest Jobs")
+    if slowest_jobs:
+        typer.echo(f"{'Job':<5} {'Run':<5} {'Target':<15} {'Duration':<8}")
+        for row in slowest_jobs:
+            duration = row['duration'] if row['duration'] is not None else 0.0
+            typer.echo(
+                f"{row['job_id']:<5} {row['scan_run_id']:<5} {row['target']:<15} {duration:<8.2f}"
+            )
+    else:
+        typer.echo("No job durations")
+
+    typer.echo("\nFailed Jobs")
+    if failed_jobs:
+        typer.echo(f"{'Job':<5} {'Run':<5} {'Target':<15} {'Error'}")
+        for row in failed_jobs:
+            typer.echo(
+                f"{row['job_id']:<5} {row['scan_run_id']:<5} {row['target']:<15} {row['error'] or ''}"
+            )
+    else:
+        typer.echo("No failed jobs")
 
 
 if __name__ == "__main__":
