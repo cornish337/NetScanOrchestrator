@@ -86,6 +86,11 @@ def main():
         help="Number of IPs/ranges per chunk for parallel scanning.\nDefault: 10."
     )
     parser.add_argument(
+        "--select-chunks",
+        action="store_true",
+        help="Prompt for specific chunk indexes to scan after chunking."
+    )
+    parser.add_argument(
         "--num-processes",
         type=int,
         default=None,
@@ -150,6 +155,32 @@ def main():
         return
     logging.info(f"          Created {len(ip_chunks)} chunk(s).")
 
+    logging.info("\nChunk Overview:")
+    logging.info("Idx | Count | Targets")
+    for idx, chunk in enumerate(ip_chunks, start=1):
+        logging.info(f"{idx:>3} | {len(chunk):>5} | {', '.join(chunk)}")
+
+    if args.select_chunks:
+        selection = input("Enter comma-separated chunk numbers to scan or press Enter to scan all: ").strip()
+        if selection:
+            try:
+                selected_ids = [int(s) for s in selection.split(',')]
+            except ValueError:
+                logging.error("Invalid chunk selection input. Proceeding with all chunks.")
+            else:
+                filtered = []
+                for cid in selected_ids:
+                    if 1 <= cid <= len(ip_chunks):
+                        filtered.append(ip_chunks[cid - 1])
+                    else:
+                        logging.warning(f"Chunk {cid} is out of range and will be ignored.")
+                if filtered:
+                    ip_chunks = filtered
+                    logging.info(f"Proceeding with {len(ip_chunks)} selected chunk(s).")
+                else:
+                    logging.error("No valid chunks selected. Exiting.")
+                    return
+
     # 3. Run scans in parallel
     logging.info(f"Step 3/5: Starting Nmap scans for {len(ip_chunks)} chunk(s) using {args.num_processes} parallel process(es)...")
     logging.info(f"          Nmap options for scan: '{args.nmap_options}'")
@@ -164,6 +195,17 @@ def main():
         logging.warning("All scan chunks resulted in errors. Nmap might not be installed or accessible by subprocesses, or options might be invalid.")
     else:
         logging.info("Parallel scanning phase complete.")
+
+    for idx, (chunk, result) in enumerate(zip(ip_chunks, raw_scan_results), start=1):
+        logging.info(f"\n--- Chunk {idx} ---")
+        logging.info(f"Targets: {', '.join(chunk)}")
+        cmd = result.get('command_line') or result.get('command')
+        if cmd:
+            logging.info(f"Command: {cmd}")
+        if result.get('nmap_output'):
+            logging.info(f"Output:\n{result['nmap_output']}")
+        if result.get('error'):
+            logging.error(f"Error: {result['error']} - {result.get('details', '')}")
 
     # 4. Consolidate results
     logging.info("Step 4/5: Consolidating scan results...")
