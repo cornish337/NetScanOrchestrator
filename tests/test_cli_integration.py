@@ -1,9 +1,9 @@
-import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import sqlite3
 
 
 class TestTyperCLI(unittest.TestCase):
@@ -12,14 +12,21 @@ class TestTyperCLI(unittest.TestCase):
         self.input_file = os.path.join(self.project_root, "tests", "test_data", "integration_test_ips.txt")
         tmp = tempfile.NamedTemporaryFile(delete=False)
         tmp.close()
-        self.repo_path = tmp.name
+        self.db_path = tmp.name
 
     def tearDown(self):
-        if os.path.exists(self.repo_path):
-            os.unlink(self.repo_path)
+        if os.path.exists(self.db_path):
+            os.unlink(self.db_path)
 
     def run_cli(self, *args):
-        cmd = [sys.executable, "-m", "src.cli.main", "--repo-file", self.repo_path, *map(str, args)]
+        cmd = [
+            sys.executable,
+            "-m",
+            "src.cli.main",
+            "--db-path",
+            self.db_path,
+            *map(str, args),
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, msg=f"Command {' '.join(cmd)} failed with {result.stderr}")
         return result.stdout.strip()
@@ -29,19 +36,23 @@ class TestTyperCLI(unittest.TestCase):
         self.run_cli("ingest", self.input_file)
         # plan
         output = self.run_cli("plan")
-        run_id = output.split()[-1]
+        run_id = int(output.split()[-1])
         # split into batches of size 1
         self.run_cli("split", run_id, "--chunk-size", "1")
         # run all batches
         self.run_cli("run", run_id)
 
-        with open(self.repo_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        self.assertEqual(len(data.get("targets", [])), 1)
-        self.assertEqual(len(data.get("scan_runs", [])), 1)
-        self.assertEqual(len(data.get("batches", [])), 1)
-        self.assertEqual(len(data.get("jobs", [])), 1)
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM targets")
+        self.assertEqual(cur.fetchone()[0], 1)
+        cur.execute("SELECT COUNT(*) FROM scan_runs")
+        self.assertEqual(cur.fetchone()[0], 1)
+        cur.execute("SELECT COUNT(*) FROM batches")
+        self.assertEqual(cur.fetchone()[0], 1)
+        cur.execute("SELECT COUNT(*) FROM jobs")
+        self.assertEqual(cur.fetchone()[0], 1)
+        conn.close()
 
 
 if __name__ == "__main__":

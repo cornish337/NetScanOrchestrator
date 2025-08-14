@@ -1,65 +1,86 @@
 from pathlib import Path
-from typing import Optional
 import typer
 
-from ..repository import Repository
+from sqlalchemy.orm import Session
+
+from ..db.session import init_engine, get_session
+from ..db import repository as db_repo
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
 
 @app.callback()
-def main(ctx: typer.Context, repo_file: Path = typer.Option(Path("data/state.json"), help="Path to repository file", dir_okay=False)):
-    """Initialise repository and attach to context."""
-    ctx.obj = Repository(repo_file)
+def main(
+    ctx: typer.Context,
+    db_path: Path = typer.Option(
+        None,
+        "--db-path",
+        help="Path to SQLite state database",
+        dir_okay=False,
+    ),
+):
+    """Initialise the database engine and attach a session to context."""
+    init_engine(str(db_path) if db_path else None)
+    ctx.obj = get_session()
 
 
 @app.command()
 def ingest(ctx: typer.Context, input_file: Path):
     """Ingest targets from a file and create Target records."""
-    repo: Repository = ctx.obj
+    session: Session = ctx.obj
     targets = [line.strip() for line in input_file.read_text().splitlines() if line.strip()]
-    for t in targets:
-        repo.create_target(t)
+    for address in targets:
+        db_repo.create_target(session, address=address)
     typer.echo(f"Ingested {len(targets)} targets")
 
 
 @app.command()
 def plan(ctx: typer.Context):
     """Create a ScanRun covering all ingested targets."""
-    repo: Repository = ctx.obj
-    target_ids = [t.id for t in repo.list_targets()]
-    run = repo.create_scan_run(target_ids)
+    session: Session = ctx.obj
+    run = db_repo.create_scan_run(session, status="planned")
     typer.echo(f"Created scan run {run.id}")
 
 
 @app.command()
-def split(ctx: typer.Context, scan_run_id: str, chunk_size: int = typer.Option(10, help="Targets per batch")):
-    """Split a ScanRun into Batches."""
-    repo: Repository = ctx.obj
-    run = repo.get_scan_run(scan_run_id)
-    if not run:
-        typer.echo(f"Scan run {scan_run_id} not found")
+def split(
+    ctx: typer.Context,
+    scan_run_id: int,
+    chunk_size: int = typer.Option(10, help="Targets per batch"),
+):
+    """Split all Targets into Batches for a ScanRun."""
+    session: Session = ctx.obj
+    targets = db_repo.list_targets(session)
+    if not targets:
+        typer.echo("No targets to batch")
         raise typer.Exit(code=1)
     batches = []
-    targets = run.target_ids
     for i in range(0, len(targets), chunk_size):
-        batch_targets = targets[i:i + chunk_size]
-        batch = repo.create_batch(scan_run_id, batch_targets)
+        batch_targets = targets[i : i + chunk_size]
+        batch = db_repo.create_batch(
+            session,
+            name=f"run{scan_run_id}_batch{i // chunk_size + 1}",
+            targets=batch_targets,
+        )
         batches.append(batch)
     typer.echo(f"Created {len(batches)} batches")
 
 
 @app.command()
-def run(ctx: typer.Context, scan_run_id: str):
+def run(ctx: typer.Context, scan_run_id: int):
     """Execute all Batches for a ScanRun, creating Job records."""
-    repo: Repository = ctx.obj
-    batches = repo.list_batches(scan_run_id)
+    session: Session = ctx.obj
+    batches = db_repo.list_batches(session)
     if not batches:
         typer.echo("No batches to run")
         raise typer.Exit(code=1)
+    jobs_created = 0
     for batch in batches:
-        artifact = f"artifact_{batch.id}.txt"
-        repo.create_job(batch.id, artifact=artifact, status="completed")
+        for target in batch.targets:
+            db_repo.create_job(
+                session, scan_run_id=scan_run_id, target_id=target.id, status="completed"
+            )
+            jobs_created += 1
     typer.echo(f"Executed {len(batches)} batches")
 
 
