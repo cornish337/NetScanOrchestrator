@@ -1,23 +1,41 @@
+"""Database session and engine management."""
+
+from __future__ import annotations
+
 import os
-import sqlite3
 from typing import Optional
 
-from src.config import STATE_DB_PATH as DEFAULT_STATE_DB_PATH
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session, Session
+
+from .models import Base
+
+DEFAULT_DB_PATH = os.path.join(".netscan_orchestrator", "state.db")
+
+_engine = None  # type: ignore
+_SessionFactory = None  # type: ignore
 
 
-def _resolve_path(override_path: Optional[str] = None) -> str:
-    """Return the state DB path from env var, override, or default."""
-    if override_path:
-        return override_path
-    return os.environ.get("STATE_DB_PATH", DEFAULT_STATE_DB_PATH)
+def init_engine(db_path: Optional[str] = None):
+    """Initialise the SQLAlchemy engine and create tables if required."""
+    global _engine, _SessionFactory
+    if _engine is not None:
+        return _engine
 
-
-def create_session(db_path: Optional[str] = None) -> sqlite3.Connection:
-    """Create a connection to the state database.
-
-    The path can be provided directly, via the STATE_DB_PATH environment variable,
-    or falls back to the default defined in :mod:`src.config`.
-    """
-    path = _resolve_path(db_path)
+    path = db_path or DEFAULT_DB_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    return sqlite3.connect(path)
+    url = f"sqlite:///{path}"
+    _engine = create_engine(url, connect_args={"check_same_thread": False})
+    _SessionFactory = scoped_session(sessionmaker(bind=_engine))
+
+    # Create tables on first use
+    Base.metadata.create_all(_engine)
+    return _engine
+
+
+def get_session(db_path: Optional[str] = None) -> Session:
+    """Return a new SQLAlchemy session, initialising the engine if needed."""
+    if _engine is None:
+        init_engine(db_path)
+    assert _SessionFactory is not None  # for type checkers
+    return _SessionFactory()
