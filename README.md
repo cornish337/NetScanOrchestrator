@@ -15,6 +15,10 @@ Nmap Parallel Scanner is a Python-based framework designed to run Nmap scans aga
 - **Scan Management:** Offers insights into scan coverage, detailing which IPs were successfully scanned, which failed, and which remain unscanned.
 - **Docker Support:** Can be built and run as a Docker container, bundling Nmap and all dependencies.
 
+## State Database
+
+The CLI persists targets and scan metadata in a SQLite database. By default the database file is created at `.netscan_orchestrator/state.db` in the current working directory. Use the `--db-path` option to point to a different location if needed. The database and its parent directory are created automatically on first use.
+
 ## Architecture Overview
 
 The Nmap Parallel Scanner consists of several core components:
