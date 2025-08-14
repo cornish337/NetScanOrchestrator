@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..db.session import init_engine, get_session
 from ..db import repository as db_repo
+from ..ip_handler import expand_targets
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -25,10 +26,17 @@ def main(
 
 
 @app.command()
-def ingest(ctx: typer.Context, input_file: Path):
+def ingest(
+    ctx: typer.Context,
+    input_file: Path,
+    max_expand: int = typer.Option(
+        4096, "--max-expand", help="Maximum addresses allowed when expanding ranges"
+    ),
+):
     """Ingest targets from a file and create Target records."""
     session: Session = ctx.obj
-    targets = [line.strip() for line in input_file.read_text().splitlines() if line.strip()]
+    with input_file.open("r", encoding="utf-8") as f:
+        targets = expand_targets(f, max_expand=max_expand)
     for address in targets:
         db_repo.create_target(session, address=address)
     typer.echo(f"Ingested {len(targets)} targets")
