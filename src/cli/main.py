@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..db.session import init_engine, get_session, DEFAULT_DB_PATH
 from ..db import repository as db_repo
+from ..db.models import JobStatus
 from .. import reporting
 from ..ip_handler import expand_targets
 from ..runner import RunnerJob, run_jobs
@@ -48,10 +49,18 @@ def ingest(
 
 
 @app.command()
-def plan(ctx: typer.Context):
+def plan(
+    ctx: typer.Context,
+    options: str = typer.Option(
+        None, "--options", help="Scan options (e.g. nmap flags)", show_default=False
+    ),
+    notes: str = typer.Option(None, "--notes", help="Optional notes for the scan run"),
+):
     """Create a ScanRun covering all ingested targets."""
     session: Session = ctx.obj
-    run = db_repo.create_scan_run(session, status="planned")
+    run = db_repo.create_scan_run(
+        session, status=JobStatus.PLANNED, options=options, notes=notes
+    )
     typer.echo(f"Created scan run {run.id}")
 
 
@@ -137,12 +146,18 @@ def run(
     runner_jobs = []
     for batch in batches:
         for target in batch.targets:
-            job = db_repo.create_job(
+            db_repo.create_job(
+                session,
+                scan_run_id=scan_run_id,
+                target_id=target.id,
+                status=JobStatus.COMPLETED,
+"""            job = db_repo.create_job(
                 session,
                 scan_run_id=scan_run_id,
                 target_id=target.id,
                 status="running",
                 started_at=datetime.utcnow(),
+"""
             )
             runner_jobs.append(RunnerJob(job_id=job.id, address=target.address))
 
