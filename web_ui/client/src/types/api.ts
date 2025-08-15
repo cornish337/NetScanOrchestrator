@@ -27,11 +27,17 @@ export interface ScanResults {
   hosts: Record<string, HostResult>;
 }
 
+export interface ScanChunk {
+  id: string; // e.g. '192.168.1.1' or a range '192.168.1.0-15'
+  status: 'pending' | 'running' | 'completed' | 'failed';
+}
+
 export interface Scan {
   scan_id: string;
   status: ScanStatus;
   progress: ScanProgress;
   results: ScanResults;
+  chunks: ScanChunk[];
 }
 
 // WebSocket Message Types
