@@ -47,13 +47,17 @@ Once installed, the `netscan` command will be available. The general workflow is
 
 For a detailed walkthrough with examples, please see the [Usage Guide](docs/USAGE.md).
 
-### Docker Compose
+### Running with Docker
+
 
 A `docker-compose.yml` file is provided to run the application inside a container. By default, the `app` service starts the Flask web UI. To build the image and start the service, run:
+
+A `docker-compose.yml` file is provided to run the Flask web UI inside a container. It maps the repository's `data/` directory to `/app/data` in the container, ensuring all scan outputs are written to a persistent location. To build the image and start the service, run:
 
 ```bash
 docker compose up --build
 ```
+
 
 The web UI will be accessible at http://localhost:5000 and will persist data to the local `data/` directory.
 
@@ -64,3 +68,17 @@ docker compose run --rm app python nmap_parallel_scanner.py --help
 ```
 
 This command executes the CLI in a one-off container and removes the container when finished.
+
+The application will be accessible at http://localhost:5000 and will persist data to the local `data/` directory.
+
+### Production Deployment
+
+For production use, run the Flask web UI with Gunicorn instead of the built-in development server:
+
+```bash
+gunicorn -b 0.0.0.0:5000 web_ui.app:app
+```
+
+This binds Gunicorn to all interfaces on port 5000 and serves the `app` object from `web_ui/app.py`.
+
+

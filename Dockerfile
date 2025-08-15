@@ -1,5 +1,6 @@
 # Stage 1: Build the web UI client
-FROM node:20 as client-build
+# Use Node.js v20.11.0 to match web_ui/client/.nvmrc
+FROM node:20.11.0-alpine as client-build
 
 WORKDIR /app/web_ui/client
 COPY web_ui/client/package*.json ./
@@ -31,4 +32,6 @@ EXPOSE 5000
 
 ENTRYPOINT ["tini", "--"]
 CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
+# Example production command using Gunicorn:
+# CMD ["gunicorn", "-b", "0.0.0.0:5000", "web_ui.app:app"]
 
