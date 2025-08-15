@@ -1,0 +1,9 @@
+.git
+__pycache__/
+node_modules/
+web_ui/client/node_modules/
+web_ui/client/dist/
+*.pyc
+.venv
+tests/
+jules-scratch/
