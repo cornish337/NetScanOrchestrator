@@ -6,7 +6,7 @@ from typing import Iterable, List, Optional, Type, TypeVar, Any
 
 from sqlalchemy.orm import Session
 
-from db.models import Target, ScanRun, Batch, Job, Result
+from .models import Target, ScanRun, Batch, Job, Result
 
 ModelType = TypeVar("ModelType", Target, ScanRun, Batch, Job, Result)
 
