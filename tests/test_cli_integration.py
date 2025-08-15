@@ -54,6 +54,25 @@ class TestTyperCLI(unittest.TestCase):
         self.assertEqual(cur.fetchone()[0], 1)
         conn.close()
 
+    def test_ingest_is_idempotent(self):
+        """Test that running ingest twice with the same file does not create duplicates."""
+        # Run ingest for the first time
+        output1 = self.run_cli("ingest", self.input_file)
+        self.assertIn("Ingested 1 new targets", output1)
+        self.assertIn("Skipped 0 duplicates", output1)
+
+        # Run ingest for the second time
+        output2 = self.run_cli("ingest", self.input_file)
+        self.assertIn("Ingested 0 new targets", output2)
+        self.assertIn("Skipped 1 duplicates", output2)
+
+        # Verify the total number of targets in the database
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM targets")
+        self.assertEqual(cur.fetchone()[0], 1)
+        conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

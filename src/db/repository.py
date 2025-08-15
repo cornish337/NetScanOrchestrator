@@ -56,6 +56,10 @@ def get_target(session: Session, target_id: int) -> Optional[Target]:
     return _get(session, Target, target_id)
 
 
+def get_target_by_address(session: Session, address: str) -> Optional[Target]:
+    return session.query(Target).filter(Target.address == address).first()
+
+
 def list_targets(session: Session) -> List[Target]:
     return _list(session, Target)
 
