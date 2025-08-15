@@ -47,9 +47,9 @@ Once installed, the `netscan` command will be available. The general workflow is
 
 For a detailed walkthrough with examples, please see the [Usage Guide](docs/USAGE.md).
 
-### Docker Compose
+### Running with Docker
 
-A `docker-compose.yml` file is provided to run the Flask web UI inside a container. To build the image and start the service, run:
+A `docker-compose.yml` file is provided to run the Flask web UI inside a container. It maps the repository's `data/` directory to `/app/data` in the container, ensuring all scan outputs are written to a persistent location. To build the image and start the service, run:
 
 ```bash
 docker compose up --build
@@ -66,3 +66,4 @@ gunicorn -b 0.0.0.0:5000 web_ui.app:app
 ```
 
 This binds Gunicorn to all interfaces on port 5000 and serves the `app` object from `web_ui/app.py`.
+
