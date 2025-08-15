@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScanChunk } from '../../types/api';
+import type { ScanChunk } from '../../types/api';
 
 interface MiniMapProps {
   chunks: ScanChunk[];

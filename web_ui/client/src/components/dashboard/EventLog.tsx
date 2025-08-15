@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Scan } from '../../types/api';
+import type { Scan } from '../../types/api';
 
 interface EventLogProps {
   scan: Scan;

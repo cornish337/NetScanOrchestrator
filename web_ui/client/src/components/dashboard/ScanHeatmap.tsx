@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
-import { ScanProgress } from '../../types/api';
+import type { ScanProgress } from '../../types/api';
 
 interface ScanHeatmapProps {
   progress: ScanProgress;

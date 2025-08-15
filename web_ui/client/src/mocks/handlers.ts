@@ -1,5 +1,5 @@
-import { http, HttpResponse, PathParams } from 'msw';
-import { Scan } from '../types/api';
+import { http, HttpResponse, type PathParams } from 'msw';
+import type { Scan } from '../types/api';
 
 // --- Mock Data ---
 
@@ -18,6 +18,7 @@ const mockRunningScan: Scan = {
       '192.168.1.3': { status: 'down', reason: 'no-response' },
     },
   },
+  chunks: [],
 };
 
 const mockCompletedScan: Scan = {
@@ -36,6 +37,7 @@ const mockCompletedScan: Scan = {
       '192.168.1.4': { status: 'up', ports: [22] },
     },
   },
+  chunks: [],
 };
 
 const mockFailedScan: Scan = {
@@ -49,6 +51,7 @@ const mockFailedScan: Scan = {
   results: {
     hosts: {},
   },
+  chunks: [],
 };
 
 const mockScans: Record<string, Scan> = {

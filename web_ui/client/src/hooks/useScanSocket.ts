@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Scan, WebSocketMessage } from '../types/api';
+import type { Scan, WebSocketMessage } from '../types/api';
 
 type SocketStatus = 'CONNECTING' | 'OPEN' | 'CLOSED' | 'ERROR';
 

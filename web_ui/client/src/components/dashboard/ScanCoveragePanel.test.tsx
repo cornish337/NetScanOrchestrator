@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ScanCoveragePanel } from './ScanCoveragePanel';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { Scan } from '../../types/api';
+import type { Scan } from '../../types/api';
 
 // Mock the useQuery hook
 vi.mock('@tanstack/react-query', async (importOriginal) => {
