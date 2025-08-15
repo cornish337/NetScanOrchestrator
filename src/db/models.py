@@ -35,6 +35,7 @@ class JobStatus(str, PyEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    PAUSED = "paused"
 
 
 class Target(Base):
@@ -46,6 +47,10 @@ class Target(Base):
     address = Column(String, unique=True, nullable=False)
     description = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Customization fields
+    tags = Column(String, nullable=True)  # Comma-separated tags
+    per_target_options = Column(String, nullable=True)  # e.g. specific nmap flags
 
     # Relationships
     batches = relationship(
@@ -89,10 +94,20 @@ class Batch(Base):
     parent_batch_id = Column(Integer, ForeignKey("batches.id"), nullable=True)
     strategy = Column(String, nullable=True)
 
+    # New fields for advanced scheduling and retry logic
+    priority = Column(Integer, default=100, nullable=False)
+    retry_of_batch_id = Column(Integer, ForeignKey("batches.id"), nullable=True)
+    planned_chunk_size = Column(Integer, nullable=True)
+
     # Self-referential relationships to support recursive splitting
-    parent = relationship("Batch", remote_side=[id], back_populates="children")
+    parent = relationship(
+        "Batch", remote_side=[id], back_populates="children", foreign_keys=[parent_batch_id]
+    )
     children = relationship(
-        "Batch", back_populates="parent", cascade="all, delete-orphan"
+        "Batch",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        foreign_keys=[parent_batch_id],
     )
 
     targets = relationship(
@@ -119,6 +134,15 @@ class Job(Base):
     status = Column(Enum(JobStatus), default=JobStatus.PENDING, nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+
+    # New fields for execution tracking and control
+    pid = Column(Integer, nullable=True)
+    exit_code = Column(Integer, nullable=True)
+    timeout_sec = Column(Integer, nullable=True)
+    nmap_options = Column(String, nullable=True)
+    attempt = Column(Integer, default=1, nullable=False)
+    max_attempts = Column(Integer, default=3, nullable=False)
+    reason = Column(String, nullable=True)  # e.g. "timeout", "killed", "error"
 
     scan_run = relationship("ScanRun", back_populates="jobs")
     target = relationship("Target", back_populates="jobs")
