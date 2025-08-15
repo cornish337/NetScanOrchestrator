@@ -1,4 +1,16 @@
-import nmap
+try:
+    import nmap
+except ModuleNotFoundError:  # pragma: no cover
+    class _PortScannerError(Exception):
+        pass
+
+    class _PortScanner:
+        PortScannerError = _PortScannerError
+
+        def __init__(self, *args, **kwargs):
+            raise self.PortScannerError("nmap program was not found")
+
+    nmap = type("nmap", (), {"PortScanner": _PortScanner, "PortScannerError": _PortScannerError})
 import logging
 from typing import List, Dict, Any # Added typing
 

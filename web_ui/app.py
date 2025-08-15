@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, render_template, abort, url_for, request, redirect, flash # Added request, redirect, flash
+from flask import Flask, render_template, abort, url_for, request, redirect, flash, BadRequest
 import datetime # Added datetime
 from multiprocessing import cpu_count # Added cpu_count
 
@@ -142,7 +142,6 @@ def index():
     return render_template('index.html', files=available_scan_files, project_files=available_project_files)
 
 
-from werkzeug.exceptions import BadRequest # Import BadRequest
 
 @app.route('/save_host_config', methods=['POST'])
 def save_host_config():

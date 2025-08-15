@@ -1,7 +1,7 @@
 """Database utilities for NetScanOrchestrator."""
 
-from db.session import get_session, init_engine
-from db.models import Base, Target, ScanRun, Batch, Job, Result, JobStatus
+from .session import get_session, init_engine
+from .models import Base, Target, ScanRun, Batch, Job, Result, JobStatus
 
 __all__ = [
     "get_session",
