@@ -1,6 +1,6 @@
 # Stage 1: Build the web UI client
 # Use Node.js v20.11.0 to match web_ui/client/.nvmrc
-FROM node:20.11.0-alpine as client-build
+FROM node:20.11.0-alpine AS client-build
 
 WORKDIR /app/web_ui/client
 COPY web_ui/client/package*.json ./

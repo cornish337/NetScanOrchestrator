@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Scan, StartScanRequest, StartScanResponse } from '../types/api';
+import type { Scan, StartScanRequest, StartScanResponse } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 

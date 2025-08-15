@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { FixedSizeList as List } from 'react-window';
-import { ScanResults } from '../../types/api';
+import type { ScanResults } from '../../types/api';
 
 interface ScanChunkTableProps {
   results: ScanResults;

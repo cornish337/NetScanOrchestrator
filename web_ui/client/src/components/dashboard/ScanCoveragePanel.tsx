@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getScan } from '../../services/api';
-import { ScanChunk } from '../../types/api';
+import type { ScanChunk } from '../../types/api';
 import { MiniMap } from './MiniMap';
 
 interface ScanCoveragePanelProps {

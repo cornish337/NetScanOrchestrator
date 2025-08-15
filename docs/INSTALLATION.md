@@ -52,6 +52,29 @@ netscan --help
 
 This should display the main help menu with a list of available commands, confirming that the installation was successful. You are now ready to use the NetScan Orchestrator. See the [Usage Guide](USAGE.md) for details on how to run scans.
 
+## Running with Docker (Recommended for Web UI)
+
+The easiest way to run the NetScan Orchestrator, including the web interface, is with Docker.
+
+### Prerequisites
+
+- **Docker**: You must have Docker installed and running on your system.
+- **Docker Compose**: This project uses `docker-compose` to orchestrate the services.
+
+### Building and Running
+
+From the root of the project directory, run the following command:
+
+```bash
+docker compose up --build
+```
+
+This command will:
+1.  Build the Docker image for the application. This includes building the frontend UI and installing all Python dependencies.
+2.  Start the application container.
+
+The web interface will be available at `http://localhost:5000`.
+
 ## Running the Web API
 
 This project includes a FastAPI-based web API that provides an alternative way to manage and monitor scans.
