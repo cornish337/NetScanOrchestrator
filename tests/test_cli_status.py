@@ -38,7 +38,7 @@ class TestCLIStatusCommand(unittest.TestCase):
         self.run_cli("run", run_id)
         status_output = self.run_cli("status")
         self.assertIn("ScanRun Summary", status_output)
-        self.assertIn("No job durations", status_output)
+        self.assertIn("Job   Run   Target          Duration", status_output)
         self.assertIn("No failed jobs", status_output)
 
 
