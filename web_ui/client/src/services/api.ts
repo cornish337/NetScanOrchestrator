@@ -22,3 +22,4 @@ export const getScan = async (scanId: string): Promise<Scan> => {
 // Add other API functions as needed, e.g., for operator controls
 // export const killScan = async (scanId: string) => { ... }
 // export const retryDifficultTargets = async (targets: string[]) => { ... }
+
