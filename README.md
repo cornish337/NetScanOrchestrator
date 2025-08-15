@@ -56,3 +56,13 @@ docker compose up --build
 ```
 
 The application will be accessible at http://localhost:5000 and will persist data to the local `data/` directory.
+
+### Production Deployment
+
+For production use, run the Flask web UI with Gunicorn instead of the built-in development server:
+
+```bash
+gunicorn -b 0.0.0.0:5000 web_ui.app:app
+```
+
+This binds Gunicorn to all interfaces on port 5000 and serves the `app` object from `web_ui/app.py`.
