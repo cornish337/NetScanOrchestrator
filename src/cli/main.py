@@ -12,7 +12,7 @@ from db import repository as db_repo
 from db.models import JobStatus
 import reporting
 from ip_handler import expand_targets
-from runner import RunnerJob, run_jobs
+from runner import run_jobs_concurrently
 
 app = typer.Typer(help="NetScan Orchestrator CLI")
 
@@ -135,13 +135,13 @@ def resplit(
 def run(
     ctx: typer.Context,
     scan_run_id: int,
-    timeout_sec: int = typer.Option(30, help="Timeout for each job"),
-    concurrency: int = typer.Option(4, help="Concurrent jobs"),
+    timeout_sec: int = typer.Option(60, help="Timeout for each nmap job"),
+    concurrency: int = typer.Option(10, help="Number of concurrent nmap jobs"),
 ):
-    """Execute all Batches for a ScanRun, creating Job records."""
+    """Execute all Batches for a ScanRun by creating and running jobs."""
     session: Session = ctx.obj
-    run = db_repo.get_scan_run(session, scan_run_id)
-    if not run:
+    scan_run = db_repo.get_scan_run(session, scan_run_id)
+    if not scan_run:
         typer.echo(f"ScanRun {scan_run_id} not found")
         raise typer.Exit(code=1)
 
@@ -150,7 +150,8 @@ def run(
         typer.echo("No batches to run for this scan run")
         raise typer.Exit(code=1)
 
-    runner_jobs = []
+    # Create all job records first
+    job_ids = []
     for batch in batches:
         for target in batch.targets:
             job = db_repo.create_job(
@@ -158,44 +159,29 @@ def run(
                 scan_run_id=scan_run_id,
                 target_id=target.id,
                 status=JobStatus.PLANNED,
+                timeout_sec=timeout_sec,
+                nmap_options=scan_run.options,
             )
-            runner_jobs.append(RunnerJob(job_id=job.id, address=target.address))
+            job_ids.append(job.id)
 
-    results = asyncio.run(
-        run_jobs(runner_jobs, timeout_sec=timeout_sec, concurrency=concurrency)
+    if not job_ids:
+        typer.echo("No jobs were created to run.")
+        raise typer.Exit()
+
+    typer.echo(f"Created {len(job_ids)} jobs. Starting runner...")
+
+    # Run the jobs concurrently
+    asyncio.run(
+        run_jobs_concurrently(
+            job_ids=job_ids,
+            db_session=session,
+            concurrency=concurrency,
+            timeout_sec=timeout_sec,
+        )
     )
 
-    timed_out_targets = []
-    for res in results:
-        db_repo.create_result(
-            session,
-            job_id=res["job_id"],
-            stdout=res.get("stdout"),
-            stderr=res.get("stderr"),
-        )
-        db_repo.update_job(
-            session,
-            res["job_id"],
-            status=res["status"],
-            completed_at=datetime.utcnow(),
-        )
-        if res["status"] == "timeout":
-            timed_out_targets.append(res["address"])
-
-    # Queue new batches for timed-out targets so planner can retry
-    for address in timed_out_targets:
-        target = next(
-            (t for t in db_repo.list_targets(session) if t.address == address), None
-        )
-        if target:
-            db_repo.create_batch(
-                session,
-                name=f"retry_{target.id}_{int(datetime.utcnow().timestamp())}",
-                targets=[target],
-
-            )
-
-    typer.echo(f"Executed {len(batches)} batches")
+    db_repo.update_scan_run(session, scan_run_id, status=JobStatus.COMPLETED, completed_at=datetime.utcnow())
+    typer.echo(f"Scan run {scan_run_id} finished.")
 
 
 @app.command()
