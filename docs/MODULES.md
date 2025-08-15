@@ -20,8 +20,15 @@ This package manages all database interactions using [SQLAlchemy](https://www.sq
 - **`reporting.py`**: Provides functions to query the database and generate summary data, such as the slowest jobs or failed jobs. This module powers the `netscan status` command.
 - **`results_handler.py`**: This module is currently **unused** in the main CLI workflow but contains functions for consolidating and formatting scan results into various file types (JSON, CSV, etc.). Its functionality has been largely superseded by the database-driven approach.
 
+## `web_api` (`web_api/`)
+This package contains the new FastAPI-based asynchronous web service.
+- **`app.py`**: The main FastAPI application file. It defines the API endpoints, handles request validation, and orchestrates the background scanning tasks. It also mounts the legacy Flask app.
+- **`deps.py`**: Contains FastAPI dependencies, such as the database session provider.
+- **`models.py`**: Defines all the Pydantic models used for API request and response validation, mirroring the API contract.
+- **`scan_manager.py`**: A simple in-memory registry for tracking active scan tasks and their associated WebSocket communication queues.
+
 ## `web_ui` (`web_ui/`)
 This directory contains a simple Flask-based web application.
 - **`app.py`**: The main Flask application file.
 - **`templates/`**: Contains the HTML templates for the web interface.
-**Note:** The web UI is not fully integrated with the new database-driven workflow and may not be fully functional. See the project `README.md` for more details on its status.
+**Note:** The legacy Flask web UI is not fully integrated with the new database-driven workflow. Its routes (`/save_host_config` and `/load_host_config`) are served by the new API server under the `/legacy` path for compatibility.
