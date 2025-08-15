@@ -5,7 +5,7 @@ import { getScan } from '../services/api';
 import { useScanSocket } from '../hooks/useScanSocket';
 import { TopControlBar } from '../components/dashboard/TopControlBar';
 import { ScanChunkTable } from '../components/dashboard/ScanChunkTable';
-import { ScanHeatmap } from '../components/dashboard/ScanHeatmap';
+import { ScanCoveragePanel } from '../components/dashboard/ScanCoveragePanel';
 import { EventLog } from '../components/dashboard/EventLog';
 
 const DashboardPage: React.FC = () => {
@@ -58,7 +58,7 @@ const DashboardPage: React.FC = () => {
       <hr style={{ margin: '20px 0' }} />
 
       <TopControlBar scanId={scan.scan_id} />
-      <ScanHeatmap progress={scan.progress} />
+      <ScanCoveragePanel scanId={scan.scan_id} />
       <ScanChunkTable results={scan.results} />
       <EventLog scan={scan} />
     </div>
