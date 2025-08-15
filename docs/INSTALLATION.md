@@ -51,3 +51,25 @@ netscan --help
 ```
 
 This should display the main help menu with a list of available commands, confirming that the installation was successful. You are now ready to use the NetScan Orchestrator. See the [Usage Guide](USAGE.md) for details on how to run scans.
+
+## Running the Web API
+
+This project includes a FastAPI-based web API that provides an alternative way to manage and monitor scans.
+
+### Prerequisites
+
+The web API dependencies (`fastapi`, `uvicorn`, etc.) are included in the `requirements.txt` file and will be installed automatically when you follow the installation steps above.
+
+### Starting the Server
+
+To run the web API, use the `uvicorn` command from the root of the project directory:
+
+```bash
+# Ensure your virtual environment is active
+source venv/bin/activate
+
+# Run the server with auto-reload for development
+uvicorn web_api.app:app --reload
+```
+
+The server will be available at `http://127.0.0.1:8000`. You can now interact with the API endpoints as described in the [Usage Guide](USAGE.md).

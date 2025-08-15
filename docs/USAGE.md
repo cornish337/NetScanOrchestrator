@@ -108,3 +108,78 @@ netscan status --json-out scan_summary.json --csv-out scan_summary.csv
   ```bash
   netscan --db-path /path/to/another.db ingest new_ips.txt
   ```
+
+## Web API Workflow
+
+In addition to the CLI, you can interact with the NetScan Orchestrator through a FastAPI-based web API. This is the primary way the new web UI interacts with the backend.
+
+First, ensure the API server is running. See the [Installation Guide](INSTALLATION.md#running-the-web-api) for instructions.
+
+### 1. Start a Scan
+
+To start a new scan, send a `POST` request to the `/api/scans` endpoint.
+
+-   **Endpoint:** `POST /api/scans`
+-   **Request Body:** A JSON object containing `targets` (a list of strings) and `nmap_options`.
+-   **Success Response:** A `202 Accepted` response with a JSON body containing the new `scan_id`.
+
+**Example using `curl`:**
+```bash
+curl -X POST http://127.0.0.1:8000/api/scans \
+-H "Content-Type: application/json" \
+-d '{
+  "targets": ["scanme.nmap.org", "192.168.1.0/24"],
+  "nmap_options": "-T4 -F"
+}'
+
+# Example Response:
+# {"scan_id":"1"}
+```
+
+### 2. Monitor Scan Progress
+
+You can get the current status and partial results of a running scan by sending a `GET` request to the `/api/scans/{scan_id}` endpoint.
+
+-   **Endpoint:** `GET /api/scans/{scan_id}`
+-   **Success Response:** A JSON object containing the scan's status, progress, and any results collected so far.
+
+**Example using `curl`:**
+```bash
+curl http://127.0.0.1:8000/api/scans/1
+
+# Example Response:
+# {
+#   "scan_id": "1",
+#   "status": "RUNNING",
+#   "progress": {
+#     "total_chunks": 255,
+#     "completed_chunks": 50,
+#     "failed_chunks": 2
+#   },
+#   "results": {
+#     "hosts": {
+#       "45.33.32.156": { "status": "up", "ports": [...], "reason": "syn-ack" }
+#     }
+#   }
+# }
+```
+
+### 3. Real-time Updates via WebSocket
+
+For real-time updates, you can connect to the WebSocket endpoint. The server will push messages as individual jobs (chunks) are completed and a final message when the scan is finished.
+
+-   **Endpoint:** `ws://127.0.0.1:8000/ws/scans/{scan_id}`
+-   **Messages:** JSON objects with a `type` (`CHUNK_UPDATE` or `SCAN_COMPLETE`) and a `payload`.
+
+**Example using a WebSocket client (like `wscat`):**
+```bash
+# First, install wscat: npm install -g wscat
+wscat -c ws://127.0.0.1:8000/ws/scans/1
+```
+
+### Legacy Endpoints
+
+The endpoints from the original Flask UI for saving and loading host configurations are still available but have been moved to the `/legacy` path to avoid conflicts.
+
+-   `POST /legacy/save_host_config`
+-   `GET /legacy/load_host_config/<filename>`
