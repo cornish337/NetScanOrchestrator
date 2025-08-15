@@ -14,8 +14,9 @@ from typing import Any, Dict, List, Optional
 import csv
 import json
 
-from .db.session import Session
-from .db.models import ScanRun, Batch, Job
+from sqlalchemy.orm import Session
+
+from db.models import ScanRun, Batch, Job
 
 
 # ---------------------------------------------------------------------------
