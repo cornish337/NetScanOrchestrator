@@ -3,9 +3,10 @@ from datetime import datetime
 from subprocess import PIPE
 from typing import List
 
-from .db.session import Session
-from .db import repository as db_repo
-from .db.models import Job, JobStatus
+from sqlalchemy.orm import Session
+
+from db import repository as db_repo
+from db.models import Job, JobStatus
 
 
 async def execute_job(job_id: int, db_session: Session, timeout_sec: int):
