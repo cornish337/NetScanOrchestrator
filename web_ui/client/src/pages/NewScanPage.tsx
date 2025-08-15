@@ -1,151 +1,104 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startScan, ScanOptions } from '../services/api';
+import { startScan } from '../services/api';
 
-export function NewScanPage() {
+const NewScanPage: React.FC = () => {
   const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [targets, setTargets] = useState('scanme.nmap.org\n192.168.1.0/24');
+  const [nmapOptions, setNmapOptions] = useState('-T4 -F');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const handleNext = () => setStep(prev => prev + 1);
+  const handleBack = () => setStep(prev => prev - 1);
 
-  const [targets, setTargets] = useState<string[]>(['']);
-  const [options, setOptions] = useState<ScanOptions>({
-    flags: '',
-    reducedMotion: prefersReducedMotion,
-  });
-  const [currentStep, setCurrentStep] = useState(1);
-
-  const handleTargetChange = (index: number, value: string) => {
-    const updated = [...targets];
-    updated[index] = value;
-    setTargets(updated);
-  };
-
-  const addTarget = () => setTargets([...targets, '']);
-
-  const removeTarget = (index: number) => {
-    const updated = targets.filter((_, i) => i !== index);
-    setTargets(updated.length > 0 ? updated : ['']);
-  };
-
-  const handleStartScan = async () => {
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      const response = await startScan({
-        targets: targets.filter((t) => t.trim() !== ''),
-        options,
-      });
-      if (response.status === 202) {
-        const id = response.data.scan_id;
-        navigate(`/dashboard?scan=${encodeURIComponent(id)}`);
-      } else {
-        console.error('Unexpected response', response);
+      // Split targets by newline and filter out empty lines
+      const targetArray = targets.split('\n').filter(t => t.trim() !== '');
+      if (targetArray.length === 0) {
+        setError('Targets list cannot be empty.');
+        setIsLoading(false);
+        return;
       }
+
+      const response = await startScan({
+        targets: targetArray,
+        nmap_options: nmapOptions,
+      });
+
+      navigate(`/dashboard?scan=${response.scan_id}`);
     } catch (err) {
-      console.error('Failed to start scan', err);
+      setError('Failed to start scan. Please try again.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const renderTargetsStep = () => (
-    <div>
-      <h2>Targets</h2>
-      {targets.map((target, idx) => (
-        <div key={idx} style={{ marginBottom: '0.5rem' }}>
-          <input
-            type="text"
-            value={target}
-            placeholder="Host or CIDR"
-            onChange={(e) => handleTargetChange(idx, e.target.value)}
-          />
-          {targets.length > 1 && (
-            <button type="button" onClick={() => removeTarget(idx)}>
-              Remove
-            </button>
-          )}
-        </div>
-      ))}
-      <button type="button" onClick={addTarget}>
-        Add Target
-      </button>
-    </div>
-  );
-
-  const renderOptionsStep = () => (
-    <div>
-      <h2>Options</h2>
-      <div>
-        <label>
-          Nmap Flags:
-          <input
-            type="text"
-            value={options.flags}
-            onChange={(e) =>
-              setOptions({ ...options, flags: e.target.value })
-            }
-          />
-        </label>
-      </div>
-      <div>
-        <label>
-          <input
-            type="checkbox"
-            checked={options.reducedMotion}
-            onChange={(e) =>
-              setOptions({ ...options, reducedMotion: e.target.checked })
-            }
-          />
-          Reduced motion
-        </label>
-      </div>
-    </div>
-  );
-
-  const renderSummaryStep = () => (
-    <div>
-      <h2>Summary</h2>
-      <div>
-        <h3>Targets</h3>
-        <ul>
-          {targets
-            .filter((t) => t.trim() !== '')
-            .map((t, idx) => (
-              <li key={idx}>{t}</li>
-            ))}
-        </ul>
-      </div>
-      <div>
-        <h3>Options</h3>
-        <p>Nmap Flags: {options.flags || '(none)'}</p>
-        <p>
-          Reduced Motion: {options.reducedMotion ? 'Enabled' : 'Disabled'}
-        </p>
-      </div>
-      <button onClick={handleStartScan}>Start Scan</button>
-    </div>
-  );
+  const preStyle: React.CSSProperties = {
+    background: '#f4f4f4',
+    padding: '10px',
+    borderRadius: '4px',
+    whiteSpace: 'pre-wrap', // wrap long lines
+    wordBreak: 'break-all', // break long words/strings
+  };
 
   return (
-    <div>
-      <h1>New Scan</h1>
-      {currentStep === 1 && renderTargetsStep()}
-      {currentStep === 2 && renderOptionsStep()}
-      {currentStep === 3 && renderSummaryStep()}
-      <div style={{ marginTop: '1rem' }}>
-        {currentStep > 1 && (
-          <button onClick={() => setCurrentStep(currentStep - 1)}>Back</button>
+    <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto', padding: '20px', textAlign: 'left' }}>
+      <h1>New Scan Wizard</h1>
+      <div style={{ margin: '20px 0' }}>
+        {step === 1 && (
+          <div>
+            <h2>Step 1: Define Targets</h2>
+            <p>Enter targets to scan, one per line (e.g., IP, hostname, CIDR).</p>
+            <textarea
+              value={targets}
+              onChange={e => setTargets(e.target.value)}
+              rows={10}
+              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+              placeholder="e.g., 192.168.1.1&#10;scanme.nmap.org&#10;10.0.0.0/24"
+            />
+          </div>
         )}
-        {currentStep < 3 && (
-          <button
-            onClick={() => setCurrentStep(currentStep + 1)}
-            disabled={
-              currentStep === 1 &&
-              targets.every((t) => t.trim() === '')
-            }
-          >
-            Next
+        {step === 2 && (
+          <div>
+            <h2>Step 2: Set Scan Options</h2>
+            <p>Provide Nmap command-line options.</p>
+            <input
+              type="text"
+              value={nmapOptions}
+              onChange={e => setNmapOptions(e.target.value)}
+              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+        {step === 3 && (
+          <div>
+            <h2>Step 3: Summary</h2>
+            <h4>Targets:</h4>
+            <pre style={preStyle}>{targets}</pre>
+            <h4>Nmap Options:</h4>
+            <pre style={preStyle}>{nmapOptions}</pre>
+            {error && <p style={{ color: 'red' }}>{error}</p>}
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        {step > 1 && <button onClick={handleBack}>Back</button>}
+        <div />
+        {step < 3 && <button onClick={handleNext}>Next</button>}
+        {step === 3 && (
+          <button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Starting Scan...' : 'Start Scan'}
           </button>
         )}
       </div>
     </div>
   );
-}
+};
+
+export { NewScanPage };

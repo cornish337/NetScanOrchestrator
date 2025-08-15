@@ -1,19 +1,25 @@
 import axios from 'axios';
+import { Scan, StartScanRequest, StartScanResponse } from '../types/api';
 
-export interface ScanOptions {
-  flags: string;
-  reducedMotion: boolean;
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export interface StartScanPayload {
-  targets: string[];
-  options: ScanOptions;
-}
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
 
-export interface StartScanResponse {
-  scan_id: string;
-}
+export const startScan = async (
+  scanRequest: StartScanRequest
+): Promise<StartScanResponse> => {
+  const response = await apiClient.post('/scans', scanRequest);
+  return response.data;
+};
 
-export async function startScan(payload: StartScanPayload) {
-  return axios.post<StartScanResponse>('/api/scans', payload);
-}
+export const getScan = async (scanId: string): Promise<Scan> => {
+  const response = await apiClient.get(`/scans/${scanId}`);
+  return response.data;
+};
+
+// Add other API functions as needed, e.g., for operator controls
+// export const killScan = async (scanId: string) => { ... }
+// export const retryDifficultTargets = async (targets: string[]) => { ... }
+
