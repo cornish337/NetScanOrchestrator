@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, render_template, abort, url_for, request, redirect, flash # Added request, redirect, flash
+from flask import Flask, render_template, abort, url_for, request, redirect, flash, send_from_directory
 import datetime # Added datetime
 from multiprocessing import cpu_count # Added cpu_count
 
@@ -119,27 +119,12 @@ def run_scan():
 
 @app.route('/')
 def index():
-    # List available JSON result files for viewing
-    available_scan_files = []
-    if os.path.exists(RESULTS_DIR):
-        try:
-            available_scan_files = sorted([f for f in os.listdir(RESULTS_DIR) if f.endswith('.json')], reverse=True)
-        except OSError as e:
-            app.logger.error(f"Error listing files in {RESULTS_DIR}: {e}")
-            flash(f"Could not list scan result files: {e}", "error")
-            pass # available_scan_files will remain empty
+    return send_from_directory("web_ui/client/dist", "index.html")
 
-    # List available JSON project configuration files
-    available_project_files = []
-    if os.path.exists(PROJECT_FILES_DIR):
-        try:
-            available_project_files = sorted([f for f in os.listdir(PROJECT_FILES_DIR) if f.endswith('.json')], reverse=True)
-        except OSError as e:
-            app.logger.error(f"Error listing files in {PROJECT_FILES_DIR}: {e}")
-            flash(f"Could not list project configuration files: {e}", "error")
-            pass # available_project_files will remain empty
 
-    return render_template('index.html', files=available_scan_files, project_files=available_project_files)
+@app.route('/assets/<path:path>')
+def assets(path):
+    return send_from_directory("web_ui/client/dist/assets", path)
 
 
 from werkzeug.exceptions import BadRequest # Import BadRequest

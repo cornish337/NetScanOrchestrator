@@ -32,6 +32,15 @@ class TestWebApp(unittest.TestCase):
         self.original_project_files_dir = web_ui_app_module.PROJECT_FILES_DIR
         web_ui_app_module.PROJECT_FILES_DIR = self.test_project_files_dir
 
+        # Prepare static files for index and assets routes
+        self.dist_dir = os.path.join(PROJECT_ROOT, 'web_ui', 'web_ui', 'client', 'dist')
+        self.assets_dir = os.path.join(self.dist_dir, 'assets')
+        os.makedirs(self.assets_dir, exist_ok=True)
+        with open(os.path.join(self.dist_dir, 'index.html'), 'w') as f:
+            f.write('<html><body>Index</body></html>')
+        with open(os.path.join(self.assets_dir, 'test.txt'), 'w') as f:
+            f.write('asset')
+
         # Capture rendered templates and their contexts
         self.rendered_templates = []
         template_rendered.connect(self._capture_template_render)
@@ -49,6 +58,11 @@ class TestWebApp(unittest.TestCase):
         # Restore the original PROJECT_FILES_DIR in the module
         from web_ui import app as web_ui_app_module
         web_ui_app_module.PROJECT_FILES_DIR = self.original_project_files_dir
+
+        # Clean up static files
+        if os.path.exists(self.dist_dir):
+            shutil.rmtree(self.dist_dir)
+
         template_rendered.disconnect(self._capture_template_render)
 
 
@@ -170,34 +184,15 @@ class TestWebApp(unittest.TestCase):
         # self.assertEqual(response_abs.status_code, 400)
 
 
-    def test_index_route_project_files_listing(self):
-        """Test that the index route lists project files correctly."""
-        # 1. Test with no files
-        self.rendered_templates = [] # Clear any previous captures
+    def test_root_serves_index_file(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(any(t['template'].name == 'index.html' for t in self.rendered_templates))
+        self.assertIn(b'Index', response.data)
 
-        # Get the context passed to index.html
-        index_template_context = next(t['context'] for t in self.rendered_templates if t['template'].name == 'index.html')
-        self.assertIn('project_files', index_template_context)
-        self.assertEqual(len(index_template_context['project_files']), 0)
-
-        # 2. Test with some files
-        dummy_files = ["proj1.json", "proj2.json"]
-        for fname in dummy_files:
-            with open(os.path.join(self.test_project_files_dir, fname), 'w') as f:
-                json.dump({"name": fname}, f)
-
-        self.rendered_templates = [] # Clear captures
-        response = self.client.get('/')
+    def test_assets_route_serves_files(self):
+        response = self.client.get('/assets/test.txt')
         self.assertEqual(response.status_code, 200)
-        index_template_context = next(t['context'] for t in self.rendered_templates if t['template'].name == 'index.html')
-
-        self.assertIn('project_files', index_template_context)
-        self.assertEqual(len(index_template_context['project_files']), len(dummy_files))
-        # The files are sorted reverse=True in the route
-        self.assertEqual(sorted(index_template_context['project_files'], reverse=True), sorted(dummy_files, reverse=True))
+        self.assertEqual(response.data, b'asset')
 
 
 if __name__ == '__main__':
