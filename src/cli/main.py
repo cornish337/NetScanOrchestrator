@@ -44,9 +44,12 @@ def ingest(
     session: Session = ctx.obj
     with input_file.open("r", encoding="utf-8") as f:
         targets = expand_targets(f, max_expand=max_expand)
+    new_targets = 0
     for address in targets:
-        db_repo.create_target(session, address=address)
-    typer.echo(f"Ingested {len(targets)} targets")
+        if not db_repo.get_target_by_address(session, address):
+            db_repo.create_target(session, address=address)
+            new_targets += 1
+    typer.echo(f"Ingested {new_targets} new targets. Skipped {len(targets) - new_targets} duplicates.")
 
 
 @app.command()
