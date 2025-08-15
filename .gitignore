@@ -67,3 +67,5 @@ htmlcov/
 /data/project_files
 /.netscan_orchestrator
 .netscan_orchestrator/state.db
+web_ui/client/package-lock.json
+web_ui/client/public/mockServiceWorker.js
