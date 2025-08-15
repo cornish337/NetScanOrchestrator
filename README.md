@@ -46,3 +46,13 @@ Once installed, the `netscan` command will be available. The general workflow is
 5.  `netscan status`
 
 For a detailed walkthrough with examples, please see the [Usage Guide](docs/USAGE.md).
+
+### Docker Compose
+
+A `docker-compose.yml` file is provided to run the Flask web UI inside a container. To build the image and start the service, run:
+
+```bash
+docker compose up --build
+```
+
+The application will be accessible at http://localhost:5000 and will persist data to the local `data/` directory.
