@@ -3,6 +3,9 @@ import os
 import json
 import shutil
 import sys
+from pathlib import Path
+
+import pytest
 from flask import template_rendered
 
 # Adjust sys.path to import app from web_ui
@@ -193,6 +196,23 @@ class TestWebApp(unittest.TestCase):
         response = self.client.get('/assets/test.txt')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, b'asset')
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    dist_dir = tmp_path / "web_ui" / "client" / "dist"
+    dist_dir.mkdir(parents=True)
+    index_file = dist_dir / "index.html"
+    index_file.write_text("<html><body>Fixture Index</body></html>")
+    monkeypatch.setattr(app, "root_path", str(tmp_path))
+    with app.test_client() as client:
+        yield client
+
+
+def test_root_route_serves_fixture_index(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"Fixture Index" in response.data
 
 
 if __name__ == '__main__':
