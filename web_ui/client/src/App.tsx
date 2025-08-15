@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import { NewScanPage } from './pages/NewScanPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { DifficultTargetsPage } from './pages/DifficultTargetsPage';
 import './App.css';
 
 function Layout() {
@@ -19,6 +20,9 @@ function Layout() {
           </li>
           <li>
             <Link to="/dashboard">Dashboard</Link>
+          </li>
+          <li>
+            <Link to="/difficult-targets">Difficult Targets</Link>
           </li>
         </ul>
       </nav>
@@ -37,6 +41,7 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<NewScanPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="difficult-targets" element={<DifficultTargetsPage />} />
         </Route>
       </Routes>
     </Router>
