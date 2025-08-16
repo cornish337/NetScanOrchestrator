@@ -15,7 +15,6 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.wsgi import WSGIMiddleware
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -29,7 +28,6 @@ from src.db.session import get_session, init_engine
 from src.ip_handler import expand_targets
 from src.runner import run_jobs_concurrently
 from web_api import deps, models
-from web_ui.app import app as flask_app
 from web_api.scan_manager import scan_manager
 
 # --- FastAPI App Initialization ---
@@ -80,13 +78,23 @@ router = APIRouter()
 @router.post(
     "/api/scans",
     status_code=status.HTTP_202_ACCEPTED,
-    response_model=models.StartScanResponse,
+    response_model=models.ScanResponse,
     tags=["Scans"],
 )
 async def start_scan(
-    scan_request: models.StartScanRequest, db: Session = Depends(deps.get_db)
+    scan_request: models.ScanRequest, db: Session = Depends(deps.get_db)
 ):
     """Initiates a new network scan."""
+    nmap_options = scan_request.nmap_options
+    if scan_request.scan_type:
+        scan_type_flag = {
+            models.ScanType.TCP: "-sT",
+            models.ScanType.UDP: "-sU",
+        }.get(scan_request.scan_type)
+
+        if scan_type_flag and scan_type_flag not in nmap_options:
+            nmap_options = f"{scan_type_flag} {nmap_options}"
+
     try:
         validated_targets = expand_targets(scan_request.targets, max_expand=4096)
     except ValueError as e:
@@ -97,7 +105,7 @@ async def start_scan(
 
     try:
         scan_run = db_repo.create_scan_run(
-            db, status=db_models.JobStatus.PENDING, options=scan_request.nmap_options
+            db, status=db_models.JobStatus.PENDING, options=nmap_options
         )
         db.commit()
 
@@ -113,7 +121,7 @@ async def start_scan(
                 scan_run_id=scan_run.id,
                 target_id=target.id,
                 status=db_models.JobStatus.PENDING,
-                nmap_options=scan_request.nmap_options,
+                nmap_options=nmap_options,
             )
             job_ids.append(job.id)
         db.commit()
@@ -125,12 +133,12 @@ async def start_scan(
     task = asyncio.create_task(scan_task_wrapper(scan_run.id, job_ids, update_queue))
     scan_manager.register_scan(str(scan_run.id), task, update_queue)
 
-    return models.StartScanResponse(scan_id=str(scan_run.id))
+    return models.ScanResponse(scan_id=str(scan_run.id))
 
 
 @router.get(
     "/api/scans/{scan_id}",
-    response_model=models.GetScanResponse,
+    response_model=models.ApiResponse,
     tags=["Scans"],
 )
 async def get_scan_status(scan_id: str, db: Session = Depends(deps.get_db)):
@@ -170,12 +178,13 @@ async def get_scan_status(scan_id: str, db: Session = Depends(deps.get_db)):
                 except (json.JSONDecodeError, KeyError):
                     continue
 
-    return models.GetScanResponse(
+    scan_status_data = models.ScanStatusResponse(
         scan_id=scan_id,
         status=scan_run.status.name.upper(),
         progress=progress,
         results=models.ScanResults(hosts=hosts_results),
     )
+    return models.ApiResponse(data=scan_status_data)
 
 
 @router.websocket("/ws/scans/{scan_id}")
@@ -213,6 +222,3 @@ async def startup_event():
 async def health_check():
     """A simple health check endpoint to confirm the API is running."""
     return JSONResponse(content={"status": "ok"})
-
-# Mount the existing Flask app to handle legacy routes under /legacy
-app.mount("/legacy", WSGIMiddleware(flask_app))
