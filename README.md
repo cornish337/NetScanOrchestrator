@@ -21,6 +21,21 @@ The application is structured as a Python package with the following key compone
 
 For more details on the modules, see the [Module Overview](docs/MODULES.md).
 
+### Scan Request Flow
+
+1. **Request:** A client submits a scan via `POST /api/scans`, handled by
+   [`web_api/app.py`](web_api/app.py). The endpoint validates and expands the
+   target list using [`src/ip_handler.py`](src/ip_handler.py) before creating a
+   database record for the scan run and individual jobs.
+2. **Job Creation:** Each target becomes a job in the database. The API spins
+   up a background task (`scan_task_wrapper`) to process these jobs.
+3. **Concurrent Execution:** The background task invokes
+   [`run_jobs_concurrently`](src/runner.py) which uses `asyncio` to execute Nmap
+   jobs in parallel, storing results and streaming updates.
+4. **Result Retrieval:** Clients poll `GET /api/scans/{scan_id}` (also in
+   `web_api/app.py`) or open the matching WebSocket to retrieve progress and the
+   latest results.
+
 ## Getting Started
 
 ### Prerequisites
