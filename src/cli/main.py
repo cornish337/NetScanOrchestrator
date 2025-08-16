@@ -173,6 +173,7 @@ def run(
     # Run the jobs concurrently
     asyncio.run(
         run_jobs_concurrently(
+            scan_run_id=scan_run_id,
             job_ids=job_ids,
             db_session=session,
             concurrency=concurrency,

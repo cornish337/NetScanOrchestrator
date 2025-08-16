@@ -9,15 +9,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from unittest.mock import patch, MagicMock
 from web_api.app import app
 
-client = TestClient(app)
-
 def test_health_check():
+    client = TestClient(app)
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 @patch("web_api.app.asyncio.create_task")
-def test_start_scan(mock_create_task):
+def test_start_scan(mock_create_task, test_db_session):
+    client = TestClient(app)
     response = client.post(
         "/api/scans",
         json={"targets": ["127.0.0.1"], "nmap_options": "-sT"},
@@ -27,7 +27,8 @@ def test_start_scan(mock_create_task):
     mock_create_task.assert_called_once()
 
 @patch("web_api.app.db_repo")
-def test_get_scan_status(mock_db_repo):
+def test_get_scan_status(mock_db_repo, test_db_session):
+    client = TestClient(app)
     # Mock the return values of the database functions
     mock_scan_run = MagicMock()
     mock_scan_run.status.name = "COMPLETED"
