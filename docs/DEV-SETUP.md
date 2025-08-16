@@ -16,3 +16,5 @@ After changing dependencies, regenerate the lockfile on Linux:
 Common error:
     SyntaxError: Unexpected token '.'
 Cause: Node <14 in WSL. Fix by using Node 20 as above.
+
+For steps to rebuild the project and Docker images during active development, see the [Fast Development Guide](FAST-DEVELOPMENT.md).
