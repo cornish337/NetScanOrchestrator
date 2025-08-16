@@ -120,7 +120,7 @@ First, ensure the API server is running. See the [Installation Guide](INSTALLATI
 To start a new scan, send a `POST` request to the `/api/scans` endpoint.
 
 -   **Endpoint:** `POST /api/scans`
--   **Request Body:** A JSON object containing `targets` (a list of strings) and `nmap_options`.
+-   **Request Body:** A JSON object containing `targets` (a list of strings), `nmap_options`, and an optional `scan_type` (`"TCP"` or `"UDP"`).
 -   **Success Response:** A `202 Accepted` response with a JSON body containing the new `scan_id`.
 
 **Example using `curl`:**
@@ -129,7 +129,8 @@ curl -X POST http://127.0.0.1:8000/api/scans \
 -H "Content-Type: application/json" \
 -d '{
   "targets": ["scanme.nmap.org", "192.168.1.0/24"],
-  "nmap_options": "-T4 -F"
+  "nmap_options": "-T4 -F",
+  "scan_type": "TCP"
 }'
 
 # Example Response:
@@ -141,7 +142,7 @@ curl -X POST http://127.0.0.1:8000/api/scans \
 You can get the current status and partial results of a running scan by sending a `GET` request to the `/api/scans/{scan_id}` endpoint.
 
 -   **Endpoint:** `GET /api/scans/{scan_id}`
--   **Success Response:** A JSON object containing the scan's status, progress, and any results collected so far.
+-   **Success Response:** A JSON object with a `data` field containing the scan's status, progress, and any results collected so far.
 
 **Example using `curl`:**
 ```bash
@@ -149,16 +150,19 @@ curl http://127.0.0.1:8000/api/scans/1
 
 # Example Response:
 # {
-#   "scan_id": "1",
-#   "status": "RUNNING",
-#   "progress": {
-#     "total_chunks": 255,
-#     "completed_chunks": 50,
-#     "failed_chunks": 2
-#   },
-#   "results": {
-#     "hosts": {
-#       "45.33.32.156": { "status": "up", "ports": [...], "reason": "syn-ack" }
+#   "status": "success",
+#   "data": {
+#     "scan_id": "1",
+#     "status": "RUNNING",
+#     "progress": {
+#       "total_chunks": 255,
+#       "completed_chunks": 50,
+#       "failed_chunks": 2
+#     },
+#     "results": {
+#       "hosts": {
+#         "45.33.32.156": { "status": "up", "ports": [...], "reason": "syn-ack" }
+#       }
 #     }
 #   }
 # }
@@ -176,10 +180,3 @@ For real-time updates, you can connect to the WebSocket endpoint. The server wil
 # First, install wscat: npm install -g wscat
 wscat -c ws://127.0.0.1:8000/ws/scans/1
 ```
-
-### Legacy Endpoints
-
-The endpoints from the original Flask UI for saving and loading host configurations are still available but have been moved to the `/legacy` path to avoid conflicts.
-
--   `POST /legacy/save_host_config`
--   `GET /legacy/load_host_config/<filename>`

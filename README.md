@@ -17,7 +17,7 @@ The application is structured as a Python package with the following key compone
 - **CLI (`src/cli/main.py`):** The main entry point for the `netscan` command, orchestrating the entire workflow.
 - **Database Layer (`src/db/`):** SQLAlchemy models and a repository pattern for all database interactions.
 - **Core Logic (`src/`):** Modules for handling IP addresses, running Nmap scans, and generating reports.
-- **Web UI (`web_ui/`):** A simple Flask-based web interface. **Note:** This component is not fully integrated with the current database-driven workflow and may not be functional.
+- **Web API (`web_api/`):** A FastAPI-based web API for managing and monitoring network scans.
 
 For more details on the modules, see the [Module Overview](docs/MODULES.md).
 
@@ -49,36 +49,20 @@ For a detailed walkthrough with examples, please see the [Usage Guide](docs/USAG
 
 ### Running with Docker
 
-
-A `docker-compose.yml` file is provided to run the application inside a container. By default, the `app` service starts the Flask web UI. To build the image and start the service, run:
-
-A `docker-compose.yml` file is provided to run the Flask web UI inside a container. It maps the repository's `data/` directory to `/app/data` in the container, ensuring all scan outputs are written to a persistent location. To build the image and start the service, run:
+A `docker-compose.yml` file is provided to run the application inside a container. To build the image and start the service, run:
 
 ```bash
 docker compose up --build
 ```
 
-
-The web UI will be accessible at http://localhost:5000 and will persist data to the local `data/` directory.
-
-The CLI is also available from the same container image. To view CLI options without starting the web server, run:
-
-```bash
-docker compose run --rm app python nmap_parallel_scanner.py --help
-```
-
-This command executes the CLI in a one-off container and removes the container when finished.
-
-The application will be accessible at http://localhost:5000 and will persist data to the local `data/` directory.
+The web API will be accessible at http://localhost:8000.
 
 ### Production Deployment
 
-For production use, run the Flask web UI with Gunicorn instead of the built-in development server:
+For production use, run the FastAPI application with Gunicorn and Uvicorn workers:
 
 ```bash
-gunicorn -b 0.0.0.0:5000 web_ui.app:app
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker web_api.app:app -b 0.0.0.0:8000
 ```
-
-This binds Gunicorn to all interfaces on port 5000 and serves the `app` object from `web_ui/app.py`.
 
 

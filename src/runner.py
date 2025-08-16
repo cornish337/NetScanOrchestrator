@@ -9,8 +9,8 @@ from typing import List, Optional, Any, Dict
 import nmap
 from sqlalchemy.orm import Session
 
-from db import repository as db_repo
-from db.models import Job, JobStatus
+from src.db import repository as db_repo
+from src.db.models import Job, JobStatus
 
 
 def _create_ws_message(msg_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:

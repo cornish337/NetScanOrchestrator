@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session, Session
 
-from db.models import Base
+from .models import Base
 
 DEFAULT_DB_PATH = os.path.join(".netscan_orchestrator", "state.db")
 

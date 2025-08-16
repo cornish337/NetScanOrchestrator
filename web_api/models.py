@@ -7,12 +7,17 @@ from pydantic import BaseModel
 
 
 # Request/Response models for POST /api/scans
-class StartScanRequest(BaseModel):
+class ScanType(str, Enum):
+    TCP = "TCP"
+    UDP = "UDP"
+
+class ScanRequest(BaseModel):
     targets: List[str]
     nmap_options: str
+    scan_type: Optional[ScanType] = None
 
 
-class StartScanResponse(BaseModel):
+class ScanResponse(BaseModel):
     scan_id: str
 
 
@@ -41,11 +46,16 @@ class ScanResults(BaseModel):
     hosts: Dict[str, HostResult]
 
 
-class GetScanResponse(BaseModel):
+class ScanStatusResponse(BaseModel):
     scan_id: str
     status: ScanStatus
     progress: ScanProgress
     results: ScanResults
+
+
+class ApiResponse(BaseModel):
+    status: str = "success"
+    data: Any
 
 
 # WebSocket Message Models
