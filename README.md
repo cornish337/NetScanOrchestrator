@@ -81,3 +81,8 @@ gunicorn -w 4 -k uvicorn.workers.UvicornWorker web_api.app:app -b 0.0.0.0:8000
 ```
 
 
+### Development Workflow
+
+For a quick checklist on keeping the backend, frontend and Docker image up to date during rapid development, see the [Fast Development Guide](docs/FAST-DEVELOPMENT.md).
+
+
