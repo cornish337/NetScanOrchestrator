@@ -135,6 +135,18 @@ def list_jobs(session: Session) -> List[Job]:
     return _list(session, Job)
 
 
+from sqlalchemy.orm import joinedload
+
+def list_jobs_for_scan_run(session: Session, scan_run_id: int) -> List[Job]:
+    """Return all Jobs for a given ScanRun, with their targets eagerly loaded."""
+    return (
+        session.query(Job)
+        .options(joinedload(Job.target))
+        .filter(Job.scan_run_id == scan_run_id)
+        .all()
+    )
+
+
 def update_job(session: Session, job_id: int, **kwargs: Any) -> Optional[Job]:
     return _update(session, Job, job_id, **kwargs)
 

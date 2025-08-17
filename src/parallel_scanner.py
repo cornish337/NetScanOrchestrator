@@ -1,5 +1,5 @@
 import multiprocessing
-from src.nmap_scanner import run_nmap_scan
+from nmap_scanner import run_nmap_scan
 from typing import List, Dict
 # We might need to wrap run_nmap_scan or pass arguments carefully for starmap
 # For now, let's assume we'll adapt the call within scan_chunks_parallel

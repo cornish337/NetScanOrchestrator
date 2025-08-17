@@ -9,8 +9,8 @@ from typing import List, Optional, Any, Dict
 import nmap
 from sqlalchemy.orm import Session
 
-from src.db import repository as db_repo
-from src.db.models import Job, JobStatus
+from db import repository as db_repo
+from db.models import Job, JobStatus
 
 
 def _create_ws_message(msg_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -18,25 +18,55 @@ def _create_ws_message(msg_type: str, payload: Dict[str, Any]) -> Dict[str, Any]
     return {"type": msg_type, "payload": payload}
 
 
-def _parse_nmap_xml_from_string(xml_string: str) -> Dict[str, Any]:
-    """Parses nmap XML output from a string into a dictionary using a temporary file."""
-    tmp_path = None
-    try:
-        # Use a temporary file to leverage python-nmap's file-based parsing
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml") as tmp:
-            tmp.write(xml_string)
-            tmp_path = tmp.name
+import xml.etree.ElementTree as ET
 
-        scanner = nmap.PortScanner()
-        scan_data = scanner.analyse_nmap_xml_scan(nmap_output_file=tmp_path)
-        # We are interested in the 'scan' dictionary which contains host details
-        return scan_data.get('scan', {})
-    except Exception:
-        # Return an empty dict if any parsing error occurs
+def _parse_nmap_xml_from_string(xml_string: str) -> Dict[str, Any]:
+    """
+    Parses nmap XML output from a string into a dictionary manually.
+    This is a workaround for issues with the python-nmap library's parsing.
+    """
+    if not xml_string:
         return {}
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
+
+    try:
+        root = ET.fromstring(xml_string)
+        scan_results = {}
+        for host in root.findall('host'):
+            host_ip = host.find('address').get('addr')
+            if not host_ip:
+                continue
+
+            status_elem = host.find('status')
+            host_status = {
+                'state': status_elem.get('state', 'unknown'),
+                'reason': status_elem.get('reason', 'N/A'),
+            }
+
+            tcp_ports = {}
+            ports_elem = host.find('ports')
+            if ports_elem:
+                for port in ports_elem.findall('port'):
+                    if port.get('protocol') == 'tcp':
+                        port_id = port.get('portid')
+                        state_elem = port.find('state')
+                        if port_id and state_elem is not None and state_elem.get('state') == 'open':
+                            service_elem = port.find('service')
+                            tcp_ports[port_id] = {
+                                'state': state_elem.get('state'),
+                                'reason': state_elem.get('reason'),
+                                'name': service_elem.get('name', '') if service_elem is not None else '',
+                                'product': service_elem.get('product', '') if service_elem is not None else '',
+                                'version': service_elem.get('version', '') if service_elem is not None else '',
+                            }
+
+            scan_results[host_ip] = {
+                'status': host_status,
+                'tcp': tcp_ports,
+            }
+        return scan_results
+    except ET.ParseError:
+        # Return an empty dict if XML is malformed
+        return {}
 
 
 async def _send_chunk_update(

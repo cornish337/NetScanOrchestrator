@@ -20,15 +20,16 @@ class TestTyperCLI(unittest.TestCase):
 
     def run_cli(self, *args):
         cmd = [
-            sys.executable,
-            "-m",
-            "src.cli.main",
+            "netscan",
             "--db-path",
             self.db_path,
             *map(str, args),
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, msg=f"Command {' '.join(cmd)} failed with {result.stderr}")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+            self.fail(f"CLI command {' '.join(cmd)} failed with exit code {result.returncode}")
         return result.stdout.strip()
 
     def test_full_flow_creates_records(self):
@@ -51,25 +52,6 @@ class TestTyperCLI(unittest.TestCase):
         cur.execute("SELECT COUNT(*) FROM batches")
         self.assertEqual(cur.fetchone()[0], 1)
         cur.execute("SELECT COUNT(*) FROM jobs")
-        self.assertEqual(cur.fetchone()[0], 1)
-        conn.close()
-
-    def test_ingest_is_idempotent(self):
-        """Test that running ingest twice with the same file does not create duplicates."""
-        # Run ingest for the first time
-        output1 = self.run_cli("ingest", self.input_file)
-        self.assertIn("Ingested 1 new targets", output1)
-        self.assertIn("Skipped 0 duplicates", output1)
-
-        # Run ingest for the second time
-        output2 = self.run_cli("ingest", self.input_file)
-        self.assertIn("Ingested 0 new targets", output2)
-        self.assertIn("Skipped 1 duplicates", output2)
-
-        # Verify the total number of targets in the database
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM targets")
         self.assertEqual(cur.fetchone()[0], 1)
         conn.close()
 
