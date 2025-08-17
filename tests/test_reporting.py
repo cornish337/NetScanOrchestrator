@@ -15,6 +15,7 @@ def test_summary_queries_and_exports(db_session):
     t1 = db_repo.create_target(db_session, address="1.1.1.1")
     t2 = db_repo.create_target(db_session, address="2.2.2.2")
     start = datetime.utcnow()
+
     db_repo.create_job(
         db_session,
         scan_run_id=run.id,
@@ -23,6 +24,7 @@ def test_summary_queries_and_exports(db_session):
         started_at=start,
         completed_at=start + timedelta(seconds=5),
     )
+
     j2 = db_repo.create_job(
         db_session,
         scan_run_id=run.id,
@@ -31,6 +33,7 @@ def test_summary_queries_and_exports(db_session):
         started_at=start,
         completed_at=start + timedelta(seconds=10),
     )
+
     db_repo.create_result(db_session, job_id=j2.id, stderr="timeout")
 
     runs = reporting.summarise_runs(db_session)
@@ -44,7 +47,6 @@ def test_summary_queries_and_exports(db_session):
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_json, \
          tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
-
         tmp_json_path = tmp_json.name
         tmp_csv_path = tmp_csv.name
 

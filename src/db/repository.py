@@ -1,11 +1,9 @@
 """Convenience CRUD helpers for database models."""
 
 from __future__ import annotations
-
 from typing import Iterable, List, Optional, Type, TypeVar, Any
-
 from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import joinedload
 from .models import Target, ScanRun, Batch, Job, Result
 
 ModelType = TypeVar("ModelType", Target, ScanRun, Batch, Job, Result)
@@ -135,8 +133,6 @@ def list_jobs(session: Session) -> List[Job]:
     return _list(session, Job)
 
 
-from sqlalchemy.orm import joinedload
-
 def list_jobs_for_scan_run(session: Session, scan_run_id: int) -> List[Job]:
     """Return all Jobs for a given ScanRun, with their targets eagerly loaded."""
     return (
@@ -146,6 +142,9 @@ def list_jobs_for_scan_run(session: Session, scan_run_id: int) -> List[Job]:
         .all()
     )
 
+def list_jobs_for_scan_run(session: Session, scan_run_id: int) -> List[Job]:
+    """Return all Jobs for a given ScanRun."""
+    return session.query(Job).filter(Job.scan_run_id == scan_run_id).all()
 
 def update_job(session: Session, job_id: int, **kwargs: Any) -> Optional[Job]:
     return _update(session, Job, job_id, **kwargs)
