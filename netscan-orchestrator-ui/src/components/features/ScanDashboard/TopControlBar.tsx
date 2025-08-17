@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, RefreshCw, XCircle } from 'lucide-react';
+import { Play, RefreshCw, XCircle } from 'lucide-react';
 
 interface TopControlBarProps {
   onStartAll: () => void;

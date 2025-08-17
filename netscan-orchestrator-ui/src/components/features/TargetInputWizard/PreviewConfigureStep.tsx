@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target } from '../../../lib/ip-utils';
+import type { Target } from '../../../lib/ip-utils';
 import { Star } from 'lucide-react';
 
 interface PreviewConfigureStepProps {

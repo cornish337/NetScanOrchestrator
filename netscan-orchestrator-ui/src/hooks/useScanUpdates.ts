@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ScanChunk, SCAN_STATUSES } from '../types/scan-types';
+import type { ScanChunk } from '../types/scan-types';
 
 /**
  * Custom hook to simulate real-time scan updates via WebSockets.
@@ -9,10 +9,9 @@ import { ScanChunk, SCAN_STATUSES } from '../types/scan-types';
  * @param setData The state setter function from the component.
  */
 export function useScanUpdates(
-  data: ScanChunk[],
   setData: React.Dispatch<React.SetStateAction<ScanChunk[]>>
 ) {
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const simulateUpdate = () => {
