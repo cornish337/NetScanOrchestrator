@@ -1,59 +1,60 @@
 import os
-import sys
 import tempfile
 from datetime import datetime, timedelta
-
 import pytest
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.db import repository as db_repo
 from src import reporting
 
-def test_summary_queries_and_exports(test_db_session):
+def test_summary_queries_and_exports(db_session):
     """
-    Tests reporting queries and export functions using an isolated DB session.
+    Tests the reporting queries (summarise_runs, get_slowest_jobs, get_failed_jobs)
+    and the JSON/CSV export functions.
     """
-    session = test_db_session
-    run = db_repo.create_scan_run(session, status="completed")
-    t1 = db_repo.create_target(session, address="1.1.1.1")
-    t2 = db_repo.create_target(session, address="2.2.2.2")
+    run = db_repo.create_scan_run(db_session, status="completed")
+    t1 = db_repo.create_target(db_session, address="1.1.1.1")
+    t2 = db_repo.create_target(db_session, address="2.2.2.2")
     start = datetime.utcnow()
+
     db_repo.create_job(
-        session,
+        db_session,
         scan_run_id=run.id,
         target_id=t1.id,
         status="completed",
         started_at=start,
         completed_at=start + timedelta(seconds=5),
     )
+
     j2 = db_repo.create_job(
-        session,
+        db_session,
         scan_run_id=run.id,
         target_id=t2.id,
         status="failed",
         started_at=start,
         completed_at=start + timedelta(seconds=10),
     )
-    db_repo.create_result(session, job_id=j2.id, stderr="timeout")
 
-    runs = reporting.summarise_runs(session)
+    db_repo.create_result(db_session, job_id=j2.id, stderr="timeout")
+
+    runs = reporting.summarise_runs(db_session)
     assert runs[0]["failed_jobs"] == 1
 
-    slowest = reporting.get_slowest_jobs(session)
+    slowest = reporting.get_slowest_jobs(db_session)
     assert slowest[0]["job_id"] == j2.id
 
-    failed = reporting.get_failed_jobs(session)
+    failed = reporting.get_failed_jobs(db_session)
     assert failed[0]["error"] == "timeout"
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_json, \
          tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
+        tmp_json_path = tmp_json.name
+        tmp_csv_path = tmp_csv.name
 
-        reporting.export_json(runs, tmp_json.name)
-        reporting.export_csv(runs, tmp_csv.name)
-
-        assert os.path.getsize(tmp_json.name) > 0
-        assert os.path.getsize(tmp_csv.name) > 0
-
-    os.unlink(tmp_json.name)
-    os.unlink(tmp_csv.name)
+    try:
+        reporting.export_json(runs, tmp_json_path)
+        reporting.export_csv(runs, tmp_csv_path)
+        assert os.path.getsize(tmp_json_path) > 0
+        assert os.path.getsize(tmp_csv_path) > 0
+    finally:
+        os.unlink(tmp_json_path)
+        os.unlink(tmp_csv_path)

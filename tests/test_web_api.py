@@ -1,7 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
-import sys
-import os
+from unittest.mock import patch
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,6 +14,7 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 @patch("web_api.app.asyncio.create_task")
+
 def test_start_scan(mock_create_task, test_db_session):
     client = TestClient(app)
     response = client.post(
@@ -25,6 +24,11 @@ def test_start_scan(mock_create_task, test_db_session):
     assert response.status_code == 202
     assert "scan_id" in response.json()
     mock_create_task.assert_called_once()
+
+
+def test_get_scan_status_not_found(client_with_db):
+    response = client_with_db.get("/api/scans/999")
+    assert response.status_code == 404
 
 @patch("web_api.app.db_repo")
 def test_get_scan_status(mock_db_repo, test_db_session):

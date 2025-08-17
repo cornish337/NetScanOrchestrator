@@ -162,21 +162,31 @@ async def get_scan_status(scan_id: str, db: Session = Depends(deps.get_db)):
 
     hosts_results = {}
     for job in jobs:
-        if job.results:
-            latest_result = job.results[-1]
-            if latest_result.summary_json:
-                try:
-                    summary = json.loads(latest_result.summary_json)
-                    for ip, data in summary.items():
-                        if not isinstance(data, dict): continue
+        target_address = job.target.address if job.target else f"unknown_target_{job.target_id}"
 
-                        hosts_results[ip] = models.HostResult(
-                            status=data.get("status", {}).get("state", "unknown"),
-                            ports=[int(p) for p in data.get("tcp", {}).keys()] + [int(p) for p in data.get("udp", {}).keys()],
-                            reason=data.get("status", {}).get("reason", "N/A"),
-                        )
-                except (json.JSONDecodeError, KeyError):
-                    continue
+        # Default to a down/unknown state
+        host_result = models.HostResult(status="down", ports=[], reason=job.status.name.lower())
+
+        if job.results and job.results[-1].summary_json:
+            try:
+                summary = json.loads(job.results[-1].summary_json)
+                # The summary is now a dict where keys are IPs
+                ip_data = next(iter(summary.values()), None)
+
+                if isinstance(ip_data, dict):
+                    host_result.status = ip_data.get("status", {}).get("state", "unknown")
+                    host_result.reason = ip_data.get("status", {}).get("reason", "N/A")
+
+                    # Extract TCP ports
+                    tcp_ports = ip_data.get("tcp", {})
+                    host_result.ports = [int(p) for p in tcp_ports.keys()]
+            except (json.JSONDecodeError, KeyError, StopIteration):
+                # If parsing fails, we stick with the default "down" status
+                pass
+
+        # Use the job's target address as the key.
+        # This assumes one job per target address in a scan run.
+        hosts_results[target_address] = host_result
 
     scan_status_data = models.ScanStatusResponse(
         scan_id=scan_id,
