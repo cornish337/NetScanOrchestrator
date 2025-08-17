@@ -1,6 +1,7 @@
 import React from 'react';
-import { ScanChunk, ScanStatus, STATUS_COLORS, STATUS_TEXT_COLORS } from '../../../types/scan-types';
-import { Play, Pause, RefreshCw, X } from 'lucide-react';
+import type { ScanChunk, ScanStatus } from '../../../types/scan-types';
+import { STATUS_COLORS, STATUS_TEXT_COLORS } from '../../../types/scan-types';
+import { RefreshCw, X } from 'lucide-react';
 
 interface ScanChunkTableProps {
   chunks: ScanChunk[];

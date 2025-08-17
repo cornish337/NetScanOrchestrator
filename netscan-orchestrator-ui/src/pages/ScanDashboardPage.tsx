@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScanChunk } from '../types/scan-types';
+import type { ScanChunk } from '../types/scan-types';
 import { generateMockScanData } from '../lib/mock-data';
 import { useScanUpdates } from '../hooks/useScanUpdates';
 import ScanChunkTable from '../components/features/ScanDashboard/ScanChunkTable';
@@ -22,7 +22,7 @@ const ScanDashboardPage: React.FC = () => {
     }, []);
 
     // Use the custom hook to simulate real-time updates
-    useScanUpdates(scanData, setScanData);
+    useScanUpdates(setScanData);
 
     const handleStartAll = () => alert("Starting all scans...");
     const handleStopAll = () => alert("Stopping all scans...");

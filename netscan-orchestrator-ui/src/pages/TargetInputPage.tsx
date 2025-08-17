@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Target, expandTargets, suggestChunkSize } from '../lib/ip-utils';
+import type { Target } from '../lib/ip-utils';
+import { expandTargets, suggestChunkSize } from '../lib/ip-utils';
 import TargetInputStep from '../components/features/TargetInputWizard/TargetInputStep';
 import PreviewConfigureStep from '../components/features/TargetInputWizard/PreviewConfigureStep';
 import ScheduleStep from '../components/features/TargetInputWizard/ScheduleStep';
